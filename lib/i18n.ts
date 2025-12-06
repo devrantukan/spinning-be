@@ -1,0 +1,318 @@
+export type Language = 'en' | 'tr'
+
+export const translations = {
+  en: {
+    // Common
+    common: {
+      loading: 'Loading...',
+      save: 'Save',
+      cancel: 'Cancel',
+      delete: 'Delete',
+      edit: 'Edit',
+      create: 'Create',
+      update: 'Update',
+      refresh: 'Refresh',
+      search: 'Search',
+      actions: 'Actions',
+      back: 'Back',
+      logout: 'Logout',
+      backToHome: '← Back to Home',
+      confirm: 'Confirm',
+      yes: 'Yes',
+      no: 'No',
+    },
+    // Admin Layout
+    admin: {
+      panel: 'Admin Panel',
+      dashboard: 'Dashboard',
+      organizations: 'Organizations',
+      users: 'Users',
+      classes: 'Classes',
+      sessions: 'Sessions',
+      bookings: 'Bookings',
+      members: 'Members',
+      instructors: 'Instructors',
+      expandSidebar: 'Expand sidebar',
+      collapseSidebar: 'Collapse sidebar',
+      checkingAuth: 'Checking authentication...',
+      goToLogin: 'Go to Login',
+      lightTheme: 'Light Theme',
+      darkTheme: 'Dark Theme',
+    },
+    // Dashboard
+    dashboard: {
+      title: 'Admin Dashboard',
+      organization: 'Organization',
+      statistics: 'Statistics',
+      loadStats: 'Load Statistics',
+      loggedIn: 'You are logged in via Supabase. Loading statistics...',
+    },
+    // Organizations
+    organizations: {
+      title: 'Organizations',
+      newOrganization: 'New Organization',
+      editOrganization: 'Edit Organization',
+      createOrganization: 'Create Organization',
+      updateOrganization: 'Update Organization',
+      allOrganizations: 'All Organizations',
+      noOrganizations: 'No organizations found',
+      name: 'Name',
+      slug: 'Slug',
+      description: 'Description',
+      contactUser: 'Contact User',
+      selectUser: 'Select a user',
+      address: 'Address',
+      phone: 'Phone',
+      website: 'Website',
+      email: 'Email',
+      socialMedia: 'Social Media Links',
+      facebook: 'Facebook',
+      twitter: 'Twitter',
+      instagram: 'Instagram',
+      linkedin: 'LinkedIn',
+      organizationId: 'Organization ID',
+      deleteConfirm: 'Are you sure you want to delete this organization? This will delete all related data!',
+      created: 'Organization created successfully!',
+      updated: 'Organization updated successfully!',
+      deleted: 'Organization deleted successfully!',
+      searchPlaceholder: 'Search organizations...',
+    },
+    // Users
+    users: {
+      title: 'Users',
+      allUsers: 'All Users',
+      noUsers: 'No users found',
+      name: 'Name',
+      email: 'Email',
+      role: 'Role',
+      organization: 'Organization',
+      memberships: 'Memberships',
+      bookings: 'Bookings',
+      created: 'Created',
+      onlyAdmins: 'Only admins can view users',
+    },
+    // Classes
+    classes: {
+      title: 'Classes',
+      newClass: 'New Class',
+      createClass: 'Create Class',
+      allClasses: 'All Classes',
+      noClasses: 'No classes found',
+      name: 'Name',
+      description: 'Description',
+      duration: 'Duration (minutes)',
+      maxCapacity: 'Max Capacity',
+      instructorId: 'Instructor ID (optional)',
+      status: 'Status',
+      sessions: 'Sessions',
+      created: 'Class created successfully!',
+    },
+    // Sessions
+    sessions: {
+      title: 'Sessions',
+      newSession: 'New Session',
+      createSession: 'Create Session',
+      allSessions: 'All Sessions',
+      noSessions: 'No sessions found',
+      class: 'Class',
+      startTime: 'Start Time',
+      endTime: 'End Time',
+      bookings: 'Bookings',
+      status: 'Status',
+      maxCapacity: 'Max Capacity',
+      created: 'Session created successfully!',
+    },
+    // Bookings
+    bookings: {
+      title: 'Bookings',
+      allBookings: 'All Bookings',
+      noBookings: 'No bookings found',
+      member: 'Member',
+      session: 'Session',
+      class: 'Class',
+      startTime: 'Start Time',
+      status: 'Status',
+      checkedIn: 'Checked In',
+      yes: 'Yes',
+      no: 'No',
+    },
+    // Members
+    members: {
+      title: 'Members',
+      allMembers: 'All Members',
+      noMembers: 'No members found',
+      name: 'Name',
+      email: 'Email',
+      role: 'Role',
+      status: 'Status',
+      bookings: 'Bookings',
+    },
+  },
+  tr: {
+    // Common
+    common: {
+      loading: 'Yükleniyor...',
+      save: 'Kaydet',
+      cancel: 'İptal',
+      delete: 'Sil',
+      edit: 'Düzenle',
+      create: 'Oluştur',
+      update: 'Güncelle',
+      refresh: 'Yenile',
+      search: 'Ara',
+      actions: 'İşlemler',
+      back: 'Geri',
+      logout: 'Çıkış Yap',
+      backToHome: '← Ana Sayfaya Dön',
+      confirm: 'Onayla',
+      yes: 'Evet',
+      no: 'Hayır',
+    },
+    // Admin Layout
+    admin: {
+      panel: 'Yönetim Paneli',
+      dashboard: 'Kontrol Paneli',
+      organizations: 'Organizasyonlar',
+      users: 'Kullanıcılar',
+      classes: 'Dersler',
+      sessions: 'Oturumlar',
+      bookings: 'Rezervasyonlar',
+      members: 'Üyeler',
+      instructors: 'Eğitmenler',
+      expandSidebar: 'Kenar çubuğunu genişlet',
+      collapseSidebar: 'Kenar çubuğunu daralt',
+      checkingAuth: 'Kimlik doğrulama kontrol ediliyor...',
+      goToLogin: 'Giriş Sayfasına Git',
+      lightTheme: 'Açık Tema',
+      darkTheme: 'Koyu Tema',
+    },
+    // Dashboard
+    dashboard: {
+      title: 'Yönetim Kontrol Paneli',
+      organization: 'Organizasyon',
+      statistics: 'İstatistikler',
+      loadStats: 'İstatistikleri Yükle',
+      loggedIn: 'Supabase ile giriş yaptınız. İstatistikler yükleniyor...',
+    },
+    // Organizations
+    organizations: {
+      title: 'Organizasyonlar',
+      newOrganization: 'Yeni Organizasyon',
+      editOrganization: 'Organizasyonu Düzenle',
+      createOrganization: 'Organizasyon Oluştur',
+      updateOrganization: 'Organizasyonu Güncelle',
+      allOrganizations: 'Tüm Organizasyonlar',
+      noOrganizations: 'Organizasyon bulunamadı',
+      name: 'Ad',
+      slug: 'Kısa Ad',
+      description: 'Açıklama',
+      contactUser: 'İletişim Kullanıcısı',
+      selectUser: 'Bir kullanıcı seçin',
+      address: 'Adres',
+      phone: 'Telefon',
+      website: 'Web Sitesi',
+      email: 'E-posta',
+      socialMedia: 'Sosyal Medya Bağlantıları',
+      facebook: 'Facebook',
+      twitter: 'Twitter',
+      instagram: 'Instagram',
+      linkedin: 'LinkedIn',
+      organizationId: 'Organizasyon ID',
+      deleteConfirm: 'Bu organizasyonu silmek istediğinizden emin misiniz? Bu işlem tüm ilgili verileri silecektir!',
+      created: 'Organizasyon başarıyla oluşturuldu!',
+      updated: 'Organizasyon başarıyla güncellendi!',
+      deleted: 'Organizasyon başarıyla silindi!',
+      searchPlaceholder: 'Organizasyonlarda ara...',
+    },
+    // Users
+    users: {
+      title: 'Kullanıcılar',
+      allUsers: 'Tüm Kullanıcılar',
+      noUsers: 'Kullanıcı bulunamadı',
+      name: 'Ad',
+      email: 'E-posta',
+      role: 'Rol',
+      organization: 'Organizasyon',
+      memberships: 'Üyelikler',
+      bookings: 'Rezervasyonlar',
+      created: 'Oluşturulma',
+      onlyAdmins: 'Sadece yöneticiler kullanıcıları görüntüleyebilir',
+    },
+    // Classes
+    classes: {
+      title: 'Dersler',
+      newClass: 'Yeni Ders',
+      createClass: 'Ders Oluştur',
+      allClasses: 'Tüm Dersler',
+      noClasses: 'Ders bulunamadı',
+      name: 'Ad',
+      description: 'Açıklama',
+      duration: 'Süre (dakika)',
+      maxCapacity: 'Maksimum Kapasite',
+      instructorId: 'Eğitmen ID (isteğe bağlı)',
+      status: 'Durum',
+      sessions: 'Oturumlar',
+      created: 'Ders başarıyla oluşturuldu!',
+    },
+    // Sessions
+    sessions: {
+      title: 'Oturumlar',
+      newSession: 'Yeni Oturum',
+      createSession: 'Oturum Oluştur',
+      allSessions: 'Tüm Oturumlar',
+      noSessions: 'Oturum bulunamadı',
+      class: 'Ders',
+      startTime: 'Başlangıç Zamanı',
+      endTime: 'Bitiş Zamanı',
+      bookings: 'Rezervasyonlar',
+      status: 'Durum',
+      maxCapacity: 'Maksimum Kapasite',
+      created: 'Oturum başarıyla oluşturuldu!',
+    },
+    // Bookings
+    bookings: {
+      title: 'Rezervasyonlar',
+      allBookings: 'Tüm Rezervasyonlar',
+      noBookings: 'Rezervasyon bulunamadı',
+      member: 'Üye',
+      session: 'Oturum',
+      class: 'Ders',
+      startTime: 'Başlangıç Zamanı',
+      status: 'Durum',
+      checkedIn: 'Giriş Yapıldı',
+      yes: 'Evet',
+      no: 'Hayır',
+    },
+    // Members
+    members: {
+      title: 'Üyeler',
+      allMembers: 'Tüm Üyeler',
+      noMembers: 'Üye bulunamadı',
+      name: 'Ad',
+      email: 'E-posta',
+      role: 'Rol',
+      status: 'Durum',
+      bookings: 'Rezervasyonlar',
+    },
+  },
+}
+
+export const getTranslation = (lang: Language, key: string): string => {
+  const keys = key.split('.')
+  let value: any = translations[lang]
+  
+  for (const k of keys) {
+    value = value?.[k]
+    if (value === undefined) {
+      // Fallback to English if translation not found
+      value = translations.en
+      for (const k2 of keys) {
+        value = value?.[k2]
+      }
+      break
+    }
+  }
+  
+  return value || key
+}
+

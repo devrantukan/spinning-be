@@ -1,0 +1,227 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Multi-tenant root model
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  description String?
+  contactUserId String?
+  contactUser User?  @relation("OrganizationContact", fields: [contactUserId], references: [id], onDelete: SetNull)
+  address   String?
+  phone     String?
+  website   String?
+  email     String?
+  // Social media links
+  facebook  String?
+  twitter   String?
+  instagram String?
+  linkedin  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  users     User[]
+  members   Member[]
+  classes   Class[]
+  sessions  Session[]
+  bookings  Booking[]
+  instructors Instructor[]
+
+  @@index([slug])
+  @@index([contactUserId])
+  @@map("organizations")
+}
+
+// User model linked to Supabase auth
+// The auth.uid from Supabase will be stored here
+model User {
+  id             String   @id @default(uuid())
+  supabaseUserId String   @unique // This links to auth.users.id in Supabase
+  email          String
+  name           String?
+  role           UserRole @default(MEMBER)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Multi-tenant relation
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Relations
+  memberships    Member[]
+  bookings       Booking[]
+  instructor     Instructor?
+  contactOrganizations Organization[] @relation("OrganizationContact")
+
+  @@index([supabaseUserId])
+  @@index([organizationId])
+  @@index([email])
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  INSTRUCTOR
+  MEMBER
+}
+
+// Member model for class participants
+model Member {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  membershipType String?
+  status         MemberStatus @default(ACTIVE)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  bookings       Booking[]
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+  @@index([userId])
+  @@map("members")
+}
+
+enum MemberStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+// Instructor model
+model Instructor {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  bio            String?
+  specialties    String[]
+  status         InstructorStatus @default(ACTIVE)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  classes        Class[]
+  sessions       Session[]
+
+  @@index([organizationId])
+  @@index([userId])
+  @@map("instructors")
+}
+
+enum InstructorStatus {
+  ACTIVE
+  INACTIVE
+}
+
+// Class model (e.g., "Morning Spin", "Evening Power")
+model Class {
+  id             String   @id @default(uuid())
+  name           String
+  description    String?
+  duration       Int      // Duration in minutes
+  maxCapacity    Int      @default(20)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  instructorId   String?
+  instructor     Instructor? @relation(fields: [instructorId], references: [id], onDelete: SetNull)
+  status         ClassStatus @default(ACTIVE)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  sessions       Session[]
+
+  @@index([organizationId])
+  @@index([instructorId])
+  @@map("classes")
+}
+
+enum ClassStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+// Session model (specific instance of a class at a date/time)
+model Session {
+  id             String   @id @default(uuid())
+  classId        String
+  class          Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  instructorId   String?
+  instructor     Instructor? @relation(fields: [instructorId], references: [id], onDelete: SetNull)
+  startTime      DateTime
+  endTime        DateTime
+  maxCapacity    Int
+  currentBookings Int    @default(0)
+  status         SessionStatus @default(SCHEDULED)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  bookings       Booking[]
+
+  @@index([organizationId])
+  @@index([classId])
+  @@index([instructorId])
+  @@index([startTime])
+  @@map("sessions")
+}
+
+enum SessionStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+// Booking model (member booking a session)
+model Booking {
+  id             String   @id @default(uuid())
+  sessionId      String
+  session        Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  memberId       String
+  member         Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  status         BookingStatus @default(CONFIRMED)
+  checkedIn      Boolean  @default(false)
+  checkedInAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([sessionId, memberId])
+  @@index([organizationId])
+  @@index([sessionId])
+  @@index([memberId])
+  @@index([userId])
+  @@map("bookings")
+}
+
+enum BookingStatus {
+  CONFIRMED
+  CANCELLED
+  NO_SHOW
+  COMPLETED
+}
+
