@@ -37,6 +37,7 @@ export async function withOrganizationContext(
     const organizationId = orgIdFromQuery || orgIdFromHeader || user.organizationId
 
     // Verify user has access to this organization
+    // ADMIN can access all organizations, TENANT_ADMIN can only access their own
     if (organizationId !== user.organizationId && user.role !== 'ADMIN') {
       return NextResponse.json(
         { error: 'Forbidden: Access denied to this organization' },
@@ -58,4 +59,5 @@ export async function withOrganizationContext(
     )
   }
 }
+
 

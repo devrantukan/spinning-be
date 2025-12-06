@@ -140,10 +140,12 @@ export default function UsersPage() {
                       fontSize: '0.85rem',
                       backgroundColor: 
                         user.role === 'ADMIN' ? '#e3f2fd' :
+                        user.role === 'TENANT_ADMIN' ? '#f3e5f5' :
                         user.role === 'INSTRUCTOR' ? '#fff3e0' :
                         '#e8f5e9',
                       color: 
                         user.role === 'ADMIN' ? '#1976d2' :
+                        user.role === 'TENANT_ADMIN' ? '#7b1fa2' :
                         user.role === 'INSTRUCTOR' ? '#f57c00' :
                         '#388e3c'
                     }}>

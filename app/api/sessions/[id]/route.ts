@@ -73,7 +73,7 @@ export async function PATCH(
   return withOrganizationContext(request, async (req, context) => {
     try {
       // Check permissions
-      if (context.user.role !== 'ADMIN' && context.user.role !== 'INSTRUCTOR') {
+      if (context.user.role !== 'ADMIN' && context.user.role !== 'TENANT_ADMIN' && context.user.role !== 'INSTRUCTOR') {
         return NextResponse.json(
           { error: 'Forbidden: Only admins and instructors can update sessions' },
           { status: 403 }
@@ -142,8 +142,8 @@ export async function DELETE(
   const { id } = await params
   return withOrganizationContext(request, async (req, context) => {
     try {
-      // Only admins can delete sessions
-      if (context.user.role !== 'ADMIN') {
+      // Only admins and tenant admins can delete sessions
+      if (context.user.role !== 'ADMIN' && context.user.role !== 'TENANT_ADMIN') {
         return NextResponse.json(
           { error: 'Forbidden: Only admins can delete sessions' },
           { status: 403 }

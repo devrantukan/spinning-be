@@ -10,10 +10,18 @@ export async function PATCH(
   const { id } = await params
   return withOrganizationContext(request, async (req, context) => {
     try {
-      // Only admins can update user roles
-      if (context.user.role !== 'ADMIN') {
+      // Only admins and tenant admins can update user roles
+      if (context.user.role !== 'ADMIN' && context.user.role !== 'TENANT_ADMIN') {
         return NextResponse.json(
           { error: 'Forbidden: Only admins can update user roles' },
+          { status: 403 }
+        )
+      }
+      
+      // TENANT_ADMIN can only set roles within their organization and cannot set ADMIN role
+      if (context.user.role === 'TENANT_ADMIN' && role === 'ADMIN') {
+        return NextResponse.json(
+          { error: 'Forbidden: Tenant admins cannot assign ADMIN role' },
           { status: 403 }
         )
       }
@@ -21,9 +29,9 @@ export async function PATCH(
       const body = await req.json()
       const { role } = body
 
-      if (!role || !['ADMIN', 'INSTRUCTOR', 'MEMBER'].includes(role)) {
+      if (!role || !['ADMIN', 'TENANT_ADMIN', 'INSTRUCTOR', 'MEMBER'].includes(role)) {
         return NextResponse.json(
-          { error: 'Invalid role. Must be ADMIN, INSTRUCTOR, or MEMBER' },
+          { error: 'Invalid role. Must be ADMIN, TENANT_ADMIN, INSTRUCTOR, or MEMBER' },
           { status: 400 }
         )
       }

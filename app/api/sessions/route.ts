@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
   return withOrganizationContext(request, async (req, context) => {
     try {
       // Check if user has permission to create sessions
-      if (context.user.role !== 'ADMIN' && context.user.role !== 'INSTRUCTOR') {
+      if (context.user.role !== 'ADMIN' && context.user.role !== 'TENANT_ADMIN' && context.user.role !== 'INSTRUCTOR') {
         return NextResponse.json(
           { error: 'Forbidden: Only admins and instructors can create sessions' },
           { status: 403 }
@@ -141,4 +141,5 @@ export async function POST(request: NextRequest) {
     }
   })
 }
+
 
