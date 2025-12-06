@@ -5,8 +5,9 @@ import { withOrganizationContext } from '@/lib/middleware'
 // PATCH /api/users/[id]/role - Update user role (admin only)
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   return withOrganizationContext(request, async (req, context) => {
     try {
       // Only admins can update user roles
@@ -30,7 +31,7 @@ export async function PATCH(
       // Verify user belongs to the same organization
       const user = await prisma.user.findFirst({
         where: {
-          id: params.id,
+          id,
           organizationId: context.organizationId
         }
       })
@@ -44,7 +45,7 @@ export async function PATCH(
 
       // Update user role
       const updated = await prisma.user.update({
-        where: { id: params.id },
+        where: { id },
         data: { role }
       })
 

@@ -5,10 +5,11 @@ import { requireAuth } from '@/lib/auth'
 // GET /api/admin/organizations/[id] - Get a specific organization
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireAuth(request)
+    const { id } = await params
     
     // Only admins can view any organization
     if (user.role !== 'ADMIN') {
@@ -19,7 +20,7 @@ export async function GET(
     }
 
     const organization = await prisma.organization.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         contactUser: {
           select: {
@@ -66,10 +67,11 @@ export async function GET(
 // PATCH /api/admin/organizations/[id] - Update an organization
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireAuth(request)
+    const { id } = await params
     
     // Only admins can update organizations
     if (user.role !== 'ADMIN') {
@@ -127,7 +129,7 @@ export async function PATCH(
       const existing = await prisma.organization.findFirst({
         where: {
           slug,
-          id: { not: params.id }
+          id: { not: id }
         }
       })
 
@@ -142,7 +144,7 @@ export async function PATCH(
     }
 
     const organization = await prisma.organization.update({
-      where: { id: params.id },
+      where: { id },
       data: updateData,
       include: {
         contactUser: {
@@ -183,10 +185,11 @@ export async function PATCH(
 // DELETE /api/admin/organizations/[id] - Delete an organization
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireAuth(request)
+    const { id } = await params
     
     // Only admins can delete organizations
     if (user.role !== 'ADMIN') {
@@ -198,7 +201,7 @@ export async function DELETE(
 
     // Check if organization exists
     const organization = await prisma.organization.findUnique({
-      where: { id: params.id }
+      where: { id }
     })
 
     if (!organization) {
@@ -210,7 +213,7 @@ export async function DELETE(
 
     // Delete organization (cascade will delete related records)
     await prisma.organization.delete({
-      where: { id: params.id }
+      where: { id }
     })
 
     return NextResponse.json({ message: 'Organization deleted successfully' })

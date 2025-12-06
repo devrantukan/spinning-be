@@ -5,13 +5,14 @@ import { withOrganizationContext } from '@/lib/middleware'
 // GET /api/sessions/[id] - Get a specific session
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   return withOrganizationContext(request, async (req, context) => {
     try {
       const session = await prisma.session.findFirst({
         where: {
-          id: params.id,
+          id,
           organizationId: context.organizationId
         },
         include: {
@@ -66,8 +67,9 @@ export async function GET(
 // PATCH /api/sessions/[id] - Update a session
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   return withOrganizationContext(request, async (req, context) => {
     try {
       // Check permissions
@@ -90,7 +92,7 @@ export async function PATCH(
 
       const session = await prisma.session.updateMany({
         where: {
-          id: params.id,
+          id,
           organizationId: context.organizationId
         },
         data: updateData
@@ -104,7 +106,7 @@ export async function PATCH(
       }
 
       const updatedSession = await prisma.session.findUnique({
-        where: { id: params.id },
+        where: { id },
         include: {
           class: true,
           instructor: {
@@ -135,8 +137,9 @@ export async function PATCH(
 // DELETE /api/sessions/[id] - Delete a session
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   return withOrganizationContext(request, async (req, context) => {
     try {
       // Only admins can delete sessions
@@ -149,7 +152,7 @@ export async function DELETE(
 
       const session = await prisma.session.deleteMany({
         where: {
-          id: params.id,
+          id,
           organizationId: context.organizationId
         }
       })

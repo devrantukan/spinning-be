@@ -5,12 +5,13 @@ import { withOrganizationContext } from '@/lib/middleware'
 // GET /api/bookings/[id] - Get a specific booking
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   return withOrganizationContext(request, async (req, context) => {
     try {
       const where: any = {
-        id: params.id,
+        id,
         organizationId: context.organizationId
       }
 
@@ -73,15 +74,16 @@ export async function GET(
 // PATCH /api/bookings/[id] - Update a booking (cancel, check-in, etc.)
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   return withOrganizationContext(request, async (req, context) => {
     try {
       const body = await req.json()
       const { status, checkedIn } = body
 
       const where: any = {
-        id: params.id,
+        id,
         organizationId: context.organizationId
       }
 
@@ -146,7 +148,7 @@ export async function PATCH(
       }
 
       const updatedBooking = await prisma.booking.findUnique({
-        where: { id: params.id },
+        where: { id },
         include: {
           session: {
             include: {
@@ -181,12 +183,13 @@ export async function PATCH(
 // DELETE /api/bookings/[id] - Cancel/delete a booking
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   return withOrganizationContext(request, async (req, context) => {
     try {
       const where: any = {
-        id: params.id,
+        id,
         organizationId: context.organizationId
       }
 
@@ -208,7 +211,7 @@ export async function DELETE(
 
       // Delete booking
       await prisma.booking.delete({
-        where: { id: params.id }
+        where: { id }
       })
 
       // Decrement session booking count if it was confirmed
