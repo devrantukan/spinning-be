@@ -19,7 +19,9 @@ export async function GET(request: NextRequest) {
         context.user.role !== "ADMIN" &&
         context.user.role !== "TENANT_ADMIN"
       ) {
-        console.log(`[GET_USERS] Access denied - user role is: ${context.user.role}`);
+        console.log(
+          `[GET_USERS] Access denied - user role is: ${context.user.role}`
+        );
         return NextResponse.json(
           { error: "Forbidden: Only admins and tenant admins can view users" },
           { status: 403 }
@@ -88,6 +90,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   return withOrganizationContext(request, async (req, context) => {
     try {
+      const body = await request.json();
+      const { email, name, role = "MEMBER" } = body;
+
       // Only admins and tenant admins can add users
       // Note: Users from tenant organizations are allowed to create instructors
       // even if their role in the database is MEMBER (they're effectively tenant admins)
@@ -102,9 +107,6 @@ export async function POST(request: NextRequest) {
           { status: 403 }
         );
       }
-
-      const body = await request.json();
-      const { email, name, role = "MEMBER" } = body;
 
       if (!email) {
         return NextResponse.json(
