@@ -17,6 +17,9 @@ export async function PATCH(
           { status: 403 }
         )
       }
+
+      const body = await req.json()
+      const { role } = body
       
       // TENANT_ADMIN can only set roles within their organization and cannot set ADMIN role
       if (context.user.role === 'TENANT_ADMIN' && role === 'ADMIN') {
@@ -25,9 +28,6 @@ export async function PATCH(
           { status: 403 }
         )
       }
-
-      const body = await req.json()
-      const { role } = body
 
       if (!role || !['ADMIN', 'TENANT_ADMIN', 'INSTRUCTOR', 'MEMBER'].includes(role)) {
         return NextResponse.json(
