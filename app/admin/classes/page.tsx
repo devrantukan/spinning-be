@@ -7,6 +7,8 @@ export default function ClassesPage() {
   const [classes, setClasses] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
+  const [selectedClass, setSelectedClass] = useState<any>(null)
+  const [loadingDetails, setLoadingDetails] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -29,17 +31,48 @@ export default function ClassesPage() {
 
     setLoading(true)
     try {
-      const res = await fetch('/api/classes', {
+      const res = await fetch('/api/admin/classes', {
         headers: {
           'Authorization': `Bearer ${tokenToUse}`
         }
       })
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to fetch classes')
+      }
+      
       const data = await res.json()
       setClasses(Array.isArray(data) ? data : [])
     } catch (error: any) {
       alert(`Error: ${error.message}`)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchClassDetails = async (classId: string) => {
+    if (!authToken) return
+
+    setLoadingDetails(true)
+    try {
+      const res = await fetch(`/api/admin/classes/${classId}`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      })
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to fetch class details')
+      }
+
+      const data = await res.json()
+      setSelectedClass(data)
+    } catch (error: any) {
+      alert(`Error: ${error.message}`)
+    } finally {
+      setLoadingDetails(false)
     }
   }
 
@@ -254,10 +287,12 @@ export default function ClassesPage() {
             <thead>
               <tr style={{ backgroundColor: '#f5f5f5' }}>
                 <th style={{ padding: '1rem', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>Name</th>
+                <th style={{ padding: '1rem', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>Organization</th>
                 <th style={{ padding: '1rem', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>Duration</th>
                 <th style={{ padding: '1rem', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>Capacity</th>
                 <th style={{ padding: '1rem', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>Status</th>
                 <th style={{ padding: '1rem', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>Sessions</th>
+                <th style={{ padding: '1rem', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -267,9 +302,12 @@ export default function ClassesPage() {
                     <strong>{cls.name}</strong>
                     {cls.description && (
                       <div style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.25rem' }}>
-                        {cls.description}
+                        {cls.description.substring(0, 50)}{cls.description.length > 50 ? '...' : ''}
                       </div>
                     )}
+                  </td>
+                  <td style={{ padding: '1rem' }}>
+                    {cls.organization?.name || 'N/A'}
                   </td>
                   <td style={{ padding: '1rem' }}>{cls.duration} min</td>
                   <td style={{ padding: '1rem' }}>{cls.maxCapacity}</td>
@@ -285,12 +323,207 @@ export default function ClassesPage() {
                     </span>
                   </td>
                   <td style={{ padding: '1rem' }}>{cls._count?.sessions || 0}</td>
+                  <td style={{ padding: '1rem' }}>
+                    <button
+                      onClick={() => fetchClassDetails(cls.id)}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        backgroundColor: '#1976d2',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        fontSize: '0.85rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      View Details
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
       </div>
+
+      {/* Details Modal */}
+      {selectedClass && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '2rem'
+          }}
+          onClick={() => setSelectedClass(null)}
+        >
+          <div
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '8px',
+              padding: '2rem',
+              maxWidth: '800px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {loadingDetails ? (
+              <div style={{ padding: '2rem', textAlign: 'center' }}>Loading details...</div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                  <h2 style={{ margin: 0 }}>{selectedClass.name}</h2>
+                  <button
+                    onClick={() => setSelectedClass(null)}
+                    style={{
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      fontSize: '1.5rem',
+                      cursor: 'pointer',
+                      color: '#666'
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                  <div>
+                    <strong style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Duration</strong>
+                    <div>{selectedClass.duration} minutes</div>
+                  </div>
+                  <div>
+                    <strong style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Max Capacity</strong>
+                    <div>{selectedClass.maxCapacity}</div>
+                  </div>
+                  <div>
+                    <strong style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Status</strong>
+                    <span style={{
+                      padding: '0.25rem 0.5rem',
+                      borderRadius: '4px',
+                      fontSize: '0.85rem',
+                      backgroundColor: selectedClass.status === 'ACTIVE' ? '#e8f5e9' : '#f5f5f5',
+                      color: selectedClass.status === 'ACTIVE' ? '#388e3c' : '#666'
+                    }}>
+                      {selectedClass.status}
+                    </span>
+                  </div>
+                  <div>
+                    <strong style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Total Sessions</strong>
+                    <div>{selectedClass._count?.sessions || 0}</div>
+                  </div>
+                </div>
+
+                {selectedClass.description && (
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <strong style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Description</strong>
+                    <div style={{ padding: '1rem', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+                      {selectedClass.description}
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <strong style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Organization</strong>
+                  <div style={{ padding: '1rem', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+                    <div><strong>{selectedClass.organization?.name || 'N/A'}</strong></div>
+                    {selectedClass.organization?.email && (
+                      <div style={{ fontSize: '0.9rem', color: '#666', marginTop: '0.25rem' }}>
+                        {selectedClass.organization.email}
+                      </div>
+                    )}
+                    {selectedClass.organization?.phone && (
+                      <div style={{ fontSize: '0.9rem', color: '#666', marginTop: '0.25rem' }}>
+                        {selectedClass.organization.phone}
+                      </div>
+                    )}
+                    {selectedClass.organization?.address && (
+                      <div style={{ fontSize: '0.9rem', color: '#666', marginTop: '0.25rem' }}>
+                        {selectedClass.organization.address}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {selectedClass.instructor && (
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <strong style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Assigned Instructor</strong>
+                    <div style={{ padding: '1rem', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+                      <div><strong>{selectedClass.instructor.user?.name || 'N/A'}</strong></div>
+                      {selectedClass.instructor.user?.email && (
+                        <div style={{ fontSize: '0.9rem', color: '#666', marginTop: '0.25rem' }}>
+                          {selectedClass.instructor.user.email}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {selectedClass.sessions && selectedClass.sessions.length > 0 && (
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <strong style={{ display: 'block', marginBottom: '0.5rem', color: '#666' }}>Recent Sessions</strong>
+                    <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                        <thead>
+                          <tr style={{ backgroundColor: '#f5f5f5' }}>
+                            <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>Start Time</th>
+                            <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>Bookings</th>
+                            <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedClass.sessions.map((session: any) => (
+                            <tr key={session.id} style={{ borderBottom: '1px solid #e0e0e0' }}>
+                              <td style={{ padding: '0.75rem' }}>
+                                {new Date(session.startTime).toLocaleString()}
+                              </td>
+                              <td style={{ padding: '0.75rem' }}>
+                                {session._count?.bookings || 0} / {session.maxCapacity}
+                              </td>
+                              <td style={{ padding: '0.75rem' }}>
+                                <span style={{
+                                  padding: '0.25rem 0.5rem',
+                                  borderRadius: '4px',
+                                  fontSize: '0.85rem',
+                                  backgroundColor: 
+                                    session.status === 'SCHEDULED' ? '#e3f2fd' :
+                                    session.status === 'COMPLETED' ? '#e8f5e9' :
+                                    session.status === 'CANCELLED' ? '#ffebee' : '#fff3e0',
+                                  color: 
+                                    session.status === 'SCHEDULED' ? '#1976d2' :
+                                    session.status === 'COMPLETED' ? '#388e3c' :
+                                    session.status === 'CANCELLED' ? '#d32f2f' : '#f57c00'
+                                }}>
+                                  {session.status}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid #e0e0e0', fontSize: '0.85rem', color: '#666' }}>
+                  <div>Created: {new Date(selectedClass.createdAt).toLocaleString()}</div>
+                  <div style={{ marginTop: '0.5rem' }}>Last Updated: {new Date(selectedClass.updatedAt).toLocaleString()}</div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

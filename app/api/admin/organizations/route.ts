@@ -93,7 +93,10 @@ export async function POST(request: NextRequest) {
       facebook,
       twitter,
       instagram,
-      linkedin
+      linkedin,
+      tiktok,
+      latitude,
+      longitude
     } = body
 
     if (!name || !slug) {
@@ -141,7 +144,10 @@ export async function POST(request: NextRequest) {
         facebook: facebook || null,
         twitter: twitter || null,
         instagram: instagram || null,
-        linkedin: linkedin || null
+        linkedin: linkedin || null,
+        tiktok: tiktok || null,
+        latitude: latitude !== undefined && latitude !== null && latitude !== '' ? parseFloat(latitude) : null,
+        longitude: longitude !== undefined && longitude !== null && longitude !== '' ? parseFloat(longitude) : null
       },
       include: {
         contactUser: {

@@ -25,7 +25,10 @@ export default function OrganizationsPage() {
     facebook: '',
     twitter: '',
     instagram: '',
-    linkedin: ''
+    linkedin: '',
+    tiktok: '',
+    latitude: '',
+    longitude: ''
   })
   const [search, setSearch] = useState('')
 
@@ -126,7 +129,10 @@ export default function OrganizationsPage() {
         facebook: '',
         twitter: '',
         instagram: '',
-        linkedin: ''
+        linkedin: '',
+        tiktok: '',
+        latitude: '',
+        longitude: ''
       })
       alert(t('organizations.created'))
     } catch (error: any) {
@@ -171,7 +177,10 @@ export default function OrganizationsPage() {
         facebook: '',
         twitter: '',
         instagram: '',
-        linkedin: ''
+        linkedin: '',
+        tiktok: '',
+        latitude: '',
+        longitude: ''
       })
       setShowForm(false)
       alert(t('organizations.updated'))
@@ -226,7 +235,10 @@ export default function OrganizationsPage() {
       facebook: org.facebook || '',
       twitter: org.twitter || '',
       instagram: org.instagram || '',
-      linkedin: org.linkedin || ''
+      linkedin: org.linkedin || '',
+      tiktok: org.tiktok || '',
+      latitude: org.latitude !== null && org.latitude !== undefined ? String(org.latitude) : '',
+      longitude: org.longitude !== null && org.longitude !== undefined ? String(org.longitude) : ''
     })
     setShowForm(true)
   }
@@ -246,7 +258,10 @@ export default function OrganizationsPage() {
       facebook: '',
       twitter: '',
       instagram: '',
-      linkedin: ''
+      linkedin: '',
+      tiktok: '',
+      latitude: '',
+      longitude: ''
     })
   }
 
@@ -537,6 +552,75 @@ export default function OrganizationsPage() {
                     value={formData.linkedin}
                     onChange={(e) => setFormData({ ...formData, linkedin: e.target.value })}
                     placeholder="https://linkedin.com/..."
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem',
+                      border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
+                      borderRadius: '4px',
+                      fontSize: '0.9rem',
+                      backgroundColor: theme === 'dark' ? '#2d2d2d' : 'white',
+                      color: theme === 'dark' ? '#ffffff' : '#1a1a1a'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.9rem' }}>
+                    TikTok
+                  </label>
+                  <input
+                    type="url"
+                    value={formData.tiktok}
+                    onChange={(e) => setFormData({ ...formData, tiktok: e.target.value })}
+                    placeholder="https://tiktok.com/@..."
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem',
+                      border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
+                      borderRadius: '4px',
+                      fontSize: '0.9rem',
+                      backgroundColor: theme === 'dark' ? '#2d2d2d' : 'white',
+                      color: theme === 'dark' ? '#ffffff' : '#1a1a1a'
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                Location Coordinates
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.9rem' }}>
+                    Latitude
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={formData.latitude}
+                    onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
+                    placeholder="e.g., 40.7128"
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem',
+                      border: `1px solid ${theme === 'dark' ? '#444' : '#ccc'}`,
+                      borderRadius: '4px',
+                      fontSize: '0.9rem',
+                      backgroundColor: theme === 'dark' ? '#2d2d2d' : 'white',
+                      color: theme === 'dark' ? '#ffffff' : '#1a1a1a'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.9rem' }}>
+                    Longitude
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={formData.longitude}
+                    onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
+                    placeholder="e.g., -74.0060"
                     style={{
                       width: '100%',
                       padding: '0.5rem',

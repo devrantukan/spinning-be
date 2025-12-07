@@ -17,7 +17,7 @@ export async function PATCH(
           { status: 403 }
         )
       }
-
+      
       const body = await req.json()
       const { role } = body
       

@@ -11,10 +11,14 @@ export async function GET(
     const user = await requireAuth(request)
     const { id } = await params
     
-    // Only admins can view any organization
-    if (user.role !== 'ADMIN') {
+    // Only admins can view any organization, or tenant admins can view their own organization
+    if (user.role === 'ADMIN') {
+      // Admins can view any organization
+    } else if (user.role === 'TENANT_ADMIN' && user.organizationId === id) {
+      // Tenant admins can only view their own organization
+    } else {
       return NextResponse.json(
-        { error: 'Forbidden: Only admins can view organizations' },
+        { error: 'Forbidden: Only admins can view organizations, or tenant admins can view their own organization' },
         { status: 403 }
       )
     }
@@ -73,10 +77,14 @@ export async function PATCH(
     const user = await requireAuth(request)
     const { id } = await params
     
-    // Only admins can update organizations
-    if (user.role !== 'ADMIN') {
+    // Only admins can update any organization, or tenant admins can update their own organization
+    if (user.role === 'ADMIN') {
+      // Admins can update any organization
+    } else if (user.role === 'TENANT_ADMIN' && user.organizationId === id) {
+      // Tenant admins can only update their own organization
+    } else {
       return NextResponse.json(
-        { error: 'Forbidden: Only admins can update organizations' },
+        { error: 'Forbidden: Only admins can update organizations, or tenant admins can update their own organization' },
         { status: 403 }
       )
     }
@@ -94,7 +102,10 @@ export async function PATCH(
       facebook,
       twitter,
       instagram,
-      linkedin
+      linkedin,
+      tiktok,
+      latitude,
+      longitude
     } = body
 
     const updateData: any = {}
@@ -123,6 +134,9 @@ export async function PATCH(
     if (twitter !== undefined) updateData.twitter = twitter || null
     if (instagram !== undefined) updateData.instagram = instagram || null
     if (linkedin !== undefined) updateData.linkedin = linkedin || null
+    if (tiktok !== undefined) updateData.tiktok = tiktok || null
+    if (latitude !== undefined) updateData.latitude = latitude !== null && latitude !== '' ? parseFloat(latitude) : null
+    if (longitude !== undefined) updateData.longitude = longitude !== null && longitude !== '' ? parseFloat(longitude) : null
     
     if (slug) {
       // Check if slug is already taken by another organization

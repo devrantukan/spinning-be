@@ -44,25 +44,47 @@ export default function AdminDashboard() {
       const org = await orgRes.json()
 
       // Fetch counts
-      const [classesRes, sessionsRes, bookingsRes, membersRes] = await Promise.all([
+      const [classesRes, sessionsRes, bookingsRes, membersRes, organizationsRes, instructorsRes] = await Promise.all([
         fetch(`/api/classes?organizationId=${org.id}`, {
-          headers: { 'Authorization': `Bearer ${authToken}` }
+          headers: { 'Authorization': `Bearer ${tokenToUse}` }
         }),
         fetch(`/api/sessions?organizationId=${org.id}`, {
-          headers: { 'Authorization': `Bearer ${authToken}` }
+          headers: { 'Authorization': `Bearer ${tokenToUse}` }
         }),
         fetch(`/api/bookings?organizationId=${org.id}`, {
-          headers: { 'Authorization': `Bearer ${authToken}` }
+          headers: { 'Authorization': `Bearer ${tokenToUse}` }
         }),
         fetch(`/api/members?organizationId=${org.id}`, {
-          headers: { 'Authorization': `Bearer ${authToken}` }
+          headers: { 'Authorization': `Bearer ${tokenToUse}` }
+        }),
+        fetch('/api/admin/organizations', {
+          headers: { 'Authorization': `Bearer ${tokenToUse}` }
+        }),
+        fetch('/api/users?role=INSTRUCTOR', {
+          headers: { 'Authorization': `Bearer ${tokenToUse}` }
         })
       ])
 
-      const classes = await classesRes.json()
-      const sessions = await sessionsRes.json()
-      const bookings = await bookingsRes.json()
-      const members = await membersRes.json()
+      const classes = classesRes.ok ? await classesRes.json() : []
+      const sessions = sessionsRes.ok ? await sessionsRes.json() : []
+      const bookings = bookingsRes.ok ? await bookingsRes.json() : []
+      const members = membersRes.ok ? await membersRes.json() : []
+      
+      let organizations = []
+      if (organizationsRes.ok) {
+        organizations = await organizationsRes.json()
+      } else {
+        const errorData = await organizationsRes.json().catch(() => ({}))
+        console.error('Failed to fetch organizations:', organizationsRes.status, errorData)
+      }
+      
+      let instructors = []
+      if (instructorsRes.ok) {
+        instructors = await instructorsRes.json()
+      } else {
+        const errorData = await instructorsRes.json().catch(() => ({}))
+        console.error('Failed to fetch instructors:', instructorsRes.status, errorData)
+      }
 
       setStats({
         organization: org,
@@ -70,7 +92,9 @@ export default function AdminDashboard() {
           classes: Array.isArray(classes) ? classes.length : 0,
           sessions: Array.isArray(sessions) ? sessions.length : 0,
           bookings: Array.isArray(bookings) ? bookings.length : 0,
-          members: Array.isArray(members) ? members.length : 0
+          members: Array.isArray(members) ? members.length : 0,
+          organizations: Array.isArray(organizations) ? organizations.length : 0,
+          instructors: Array.isArray(instructors) ? instructors.length : 0
         }
       })
     } catch (error: any) {
@@ -152,6 +176,12 @@ export default function AdminDashboard() {
             gap: '1.5rem'
           }}>
             <StatCard
+              title={t('admin.organizations')}
+              value={stats.counts.organizations}
+              icon="🏢"
+              color="#9c27b0"
+            />
+            <StatCard
               title={t('admin.classes')}
               value={stats.counts.classes}
               icon="🚴"
@@ -174,6 +204,12 @@ export default function AdminDashboard() {
               value={stats.counts.members}
               icon="👤"
               color="#7b1fa2"
+            />
+            <StatCard
+              title={t('admin.instructors')}
+              value={stats.counts.instructors}
+              icon="🎓"
+              color="#d84315"
             />
           </div>
         </div>
