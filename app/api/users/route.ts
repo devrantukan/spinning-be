@@ -6,16 +6,27 @@ import { withOrganizationContext } from "@/lib/middleware";
 export async function GET(request: NextRequest) {
   return withOrganizationContext(request, async (req, context) => {
     try {
+      // Log the user's role for debugging
+      console.log(`[GET_USERS] User role check:`, {
+        userId: context.user.id,
+        email: context.user.email,
+        role: context.user.role,
+        organizationId: context.organizationId,
+      });
+
       // Only admins and tenant admins can view users
       if (
         context.user.role !== "ADMIN" &&
         context.user.role !== "TENANT_ADMIN"
       ) {
+        console.log(`[GET_USERS] Access denied - user role is: ${context.user.role}`);
         return NextResponse.json(
           { error: "Forbidden: Only admins and tenant admins can view users" },
           { status: 403 }
         );
       }
+
+      console.log(`[GET_USERS] Access granted for role: ${context.user.role}`);
 
       const { searchParams } = req.nextUrl;
       const role = searchParams.get("role");
