@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { createServerClient } from './supabase'
+import { createAuthClient } from './supabase'
 import { prisma } from './prisma'
 
 export interface AuthUser {
@@ -24,8 +24,8 @@ export async function getAuthUser(request: NextRequest): Promise<AuthUser | null
 
     const token = authHeader.replace('Bearer ', '')
     
-    // Use server client with service role for token verification
-    const supabase = createServerClient()
+    // Use anon key client for token verification (service role bypasses auth checks)
+    const supabase = createAuthClient()
     
     // Verify the token with Supabase
     const { data: { user: supabaseUser }, error } = await supabase.auth.getUser(token)

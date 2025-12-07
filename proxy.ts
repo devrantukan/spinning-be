@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-export function middleware(request: NextRequest) {
+export default function proxy(request: NextRequest) {
   // Handle CORS preflight requests
   if (request.method === 'OPTIONS') {
     return new NextResponse(null, {
@@ -26,7 +26,7 @@ export function middleware(request: NextRequest) {
   return response
 }
 
-// Configure which routes the middleware applies to
+// Configure which routes the proxy applies to
 export const config = {
   matcher: '/api/:path*',
 }
