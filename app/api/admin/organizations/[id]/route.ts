@@ -56,7 +56,7 @@ export async function GET(
     }
 
     // Exclude SMTP password from response for security
-    const { smtpPassword, ...organizationSafe } = organization;
+    const { smtpPassword, ...organizationSafe } = organization as any;
 
     return NextResponse.json({
       ...organizationSafe,
@@ -140,8 +140,11 @@ export async function PATCH(
             { status: 400 }
           );
         }
+        updateData.contactUser = { connect: { id: contactUserId } };
+      } else {
+        // Disconnect the relation when contactUserId is null or empty
+        updateData.contactUser = { disconnect: true };
       }
-      updateData.contactUserId = contactUserId || null;
     }
     if (address !== undefined) updateData.address = address || null;
     if (phone !== undefined) updateData.phone = phone || null;
@@ -160,12 +163,27 @@ export async function PATCH(
         longitude !== null && longitude !== "" ? parseFloat(longitude) : null;
     // SMTP Configuration
     if (smtpHost !== undefined) updateData.smtpHost = smtpHost || null;
-    if (smtpPort !== undefined)
-      updateData.smtpPort =
-        smtpPort !== null && smtpPort !== "" ? parseInt(smtpPort, 10) : null;
+    if (smtpPort !== undefined) {
+      if (smtpPort === null || smtpPort === "" || smtpPort === undefined) {
+        updateData.smtpPort = null;
+      } else {
+        // Handle both number and string inputs
+        const portNum =
+          typeof smtpPort === "number"
+            ? smtpPort
+            : parseInt(String(smtpPort), 10);
+        updateData.smtpPort = isNaN(portNum) ? null : portNum;
+      }
+    }
     if (smtpUser !== undefined) updateData.smtpUser = smtpUser || null;
-    if (smtpPassword !== undefined)
-      updateData.smtpPassword = smtpPassword || null;
+    if (smtpPassword !== undefined) {
+      // Only update password if it's provided and not empty (empty string means keep current)
+      if (smtpPassword === "" || smtpPassword === null) {
+        // Don't update password - keep current one
+      } else {
+        updateData.smtpPassword = smtpPassword;
+      }
+    }
     if (smtpFromEmail !== undefined)
       updateData.smtpFromEmail = smtpFromEmail || null;
     if (smtpFromName !== undefined)
@@ -219,8 +237,23 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     console.error("Error updating organization:", error);
+    console.error("Error details:", {
+      message: error.message,
+      code: error.code,
+      meta: error.meta,
+      stack: error.stack,
+    });
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error: error.message || "Internal server error",
+        details:
+          process.env.NODE_ENV === "development"
+            ? {
+                code: error.code,
+                meta: error.meta,
+              }
+            : undefined,
+      },
       { status: 500 }
     );
   }

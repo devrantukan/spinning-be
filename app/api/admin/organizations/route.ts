@@ -136,7 +136,9 @@ export async function POST(request: NextRequest) {
         name,
         slug,
         description: description || null,
-        contactUserId: contactUserId || null,
+        contactUser: contactUserId 
+          ? { connect: { id: contactUserId } }
+          : undefined,
         address: address || null,
         phone: phone || null,
         website: website || null,
