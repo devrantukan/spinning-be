@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase'
 import { prisma } from '@/lib/prisma'
+import { sendPasswordResetEmail } from '@/lib/email'
 
 // POST /api/users/[id]/reset-password - Send password reset email to user
 export async function POST(
@@ -20,14 +21,21 @@ export async function POST(
       )
     }
 
-    // Get user from database
+    // Get user from database with organization SMTP settings
     const dbUser = await prisma.user.findUnique({
       where: { id },
       include: {
         organization: {
           select: {
             id: true,
-            name: true
+            name: true,
+            // SMTP Configuration
+            smtpHost: true,
+            smtpPort: true,
+            smtpUser: true,
+            smtpPassword: true,
+            smtpFromEmail: true,
+            smtpFromName: true,
           }
         }
       }
@@ -62,9 +70,12 @@ export async function POST(
         )
       }
 
-      // Try to send password reset email using generateLink with redirectTo option
-      // Note: generateLink with type 'recovery' should automatically send the email
-      // if email provider is configured in Supabase project settings
+      // Generate password reset link using generateLink
+      // IMPORTANT: generateLink does NOT send emails automatically!
+      // Supabase will only send the email if SMTP is configured in Dashboard:
+      // - Go to: Authentication > Emails > SMTP Settings
+      // - Enable "Custom SMTP" and configure your SMTP provider (SendGrid, Mailgun, Resend, etc.)
+      // Without SMTP configured, the link will be generated but no email will be sent
       // Redirect to reset-password page to handle the token
       // Get tenant URL from request header (preferred), body, or environment variable
       // Priority: Header > Body > Environment Variable
@@ -187,18 +198,47 @@ export async function POST(
         }
       }
 
-      // Important: generateLink should automatically send the email IF email provider is configured
-      // If emails are not being sent:
-      // 1. Check Supabase Dashboard > Settings > Auth > Email Templates
-      // 2. Configure custom SMTP provider (recommended for production)
-      // 3. Check Supabase Auth logs for email delivery errors
+      // Send password reset email directly using our SMTP configuration
+      // This bypasses Supabase's email sending and uses our own SMTP server
+      if (!resetLink) {
+        return NextResponse.json(
+          { error: 'Failed to generate password reset link' },
+          { status: 500 }
+        )
+      }
+
+      console.log(`[RESET_PASSWORD] Sending password reset email to ${dbUser.email} via SMTP`)
+      // Use organization SMTP settings if available, otherwise fallback to env vars
+      const emailResult = await sendPasswordResetEmail(
+        dbUser.email,
+        resetLink,
+        dbUser.name || undefined,
+        dbUser.organization // Pass organization SMTP config
+      )
+
+      if (!emailResult.success) {
+        // If email sending fails, still return success but include the link
+        // This allows admin to manually send the link if needed
+        console.error(`[RESET_PASSWORD] Failed to send email:`, emailResult.error)
+        
+        return NextResponse.json({
+          success: true,
+          message: 'Password reset link generated, but email sending failed.',
+          link: resetLink,
+          emailSent: false,
+          emailError: emailResult.error,
+          warning: 'Please configure SMTP settings (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD) or send the link manually.',
+        })
+      }
+
+      console.log(`[RESET_PASSWORD] Password reset email sent successfully to ${dbUser.email}`)
       
       return NextResponse.json({
         success: true,
         message: 'Password reset email sent successfully. Please check your inbox (and spam folder).',
-        // Include link in response for development/testing - remove in production
-        link: resetLink,
-        note: 'If email not received, check Supabase email configuration and spam folder'
+        emailSent: true,
+        // Include link in response for development/testing only
+        ...(process.env.NODE_ENV === 'development' && { link: resetLink }),
       })
     } catch (error: any) {
       console.error('Error resetting password:', error)

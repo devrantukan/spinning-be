@@ -31,6 +31,13 @@ model Organization {
   // Location coordinates
   latitude  Float?
   longitude Float?
+  // SMTP Configuration (for sending emails)
+  smtpHost     String?
+  smtpPort     Int?
+  smtpUser     String?
+  smtpPassword String? // Stored encrypted in production
+  smtpFromEmail String?
+  smtpFromName  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
