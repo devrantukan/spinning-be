@@ -66,9 +66,68 @@ export async function POST(
       // Note: generateLink with type 'recovery' should automatically send the email
       // if email provider is configured in Supabase project settings
       // Redirect to reset-password page to handle the token
-      const redirectUrl = process.env.NEXT_PUBLIC_SITE_URL 
-        ? `${process.env.NEXT_PUBLIC_SITE_URL}/reset-password`
+      // Get tenant URL from request header (preferred), body, or environment variable
+      // Priority: Header > Body > Environment Variable
+      let tenantUrlRaw: string | null = null
+      
+      // Check header first (most reliable, doesn't consume request body)
+      const tenantUrlFromHeader = request.headers.get('X-Tenant-URL')
+      console.log(`[RESET_PASSWORD] Checking for tenant URL:`, {
+        headerPresent: !!tenantUrlFromHeader,
+        headerValue: tenantUrlFromHeader,
+        envTenantUrl: process.env.TENANT_URL,
+        envNextPublicSiteUrl: process.env.NEXT_PUBLIC_SITE_URL
+      })
+      
+      if (tenantUrlFromHeader) {
+        tenantUrlRaw = tenantUrlFromHeader
+      } else {
+        // Try to read from body (only if header not present)
+        try {
+          // Clone the request to read body without consuming it
+          const clonedRequest = request.clone()
+          const body = await clonedRequest.json().catch(() => ({}))
+          if (body && body.tenantUrl) {
+            tenantUrlRaw = body.tenantUrl
+            console.log(`[RESET_PASSWORD] Found tenant URL in body:`, body.tenantUrl)
+          }
+        } catch (e) {
+          // Body might be empty or already consumed, that's okay
+          console.log(`[RESET_PASSWORD] Could not read body:`, e)
+        }
+        
+        // Fall back to environment variables
+        if (!tenantUrlRaw) {
+          tenantUrlRaw = process.env.TENANT_URL || process.env.NEXT_PUBLIC_SITE_URL || null
+          if (tenantUrlRaw) {
+            console.log(`[RESET_PASSWORD] Using tenant URL from environment:`, tenantUrlRaw)
+          }
+        }
+      }
+      
+      // Normalize the URL (remove trailing slash if present)
+      const tenantUrl = tenantUrlRaw ? tenantUrlRaw.replace(/\/$/, '') : null
+      
+      const redirectUrl = tenantUrl
+        ? `${tenantUrl}/reset-password`
         : 'http://localhost:3000/reset-password'
+      
+      console.log(`[RESET_PASSWORD] Final redirect URL: ${redirectUrl}`, {
+        fromHeader: !!tenantUrlFromHeader,
+        tenantUrlRaw,
+        tenantUrl,
+        redirectUrl
+      })
+      
+      // Generate password reset link
+      // IMPORTANT: redirectTo URL must be whitelisted in Supabase Dashboard:
+      // Authentication > URL Configuration > Redirect URLs
+      // Also check: Authentication > Settings > Site URL (should not override redirectTo)
+      console.log(`[RESET_PASSWORD] Calling generateLink with:`, {
+        type: 'recovery',
+        email: dbUser.email,
+        redirectTo: redirectUrl
+      })
       
       const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
         type: 'recovery',
@@ -86,16 +145,47 @@ export async function POST(
           { 
             error: `Failed to send password reset email: ${linkError.message}`,
             details: linkError.message,
-            suggestion: 'Please ensure email is configured in Supabase project settings (Settings > Auth > Email Templates)'
+            suggestion: 'Please ensure email is configured in Supabase project settings (Settings > Auth > Email Templates) and that redirectTo URL is whitelisted in Authentication > URL Configuration > Redirect URLs'
           },
           { status: 400 }
         )
       }
 
       // Log the generated link for debugging
-      const resetLink = linkData.properties?.action_link
-      console.log(`Password reset link generated for ${dbUser.email}`)
-      console.log(`Reset link: ${resetLink}`)
+      let resetLink = linkData.properties?.action_link
+      console.log(`[RESET_PASSWORD] Link generated for ${dbUser.email}`)
+      console.log(`[RESET_PASSWORD] Original generated link: ${resetLink}`)
+      
+      // Check if the redirect URL in the generated link matches what we requested
+      // If not, manually fix it (Supabase might be using Site URL from dashboard instead of redirectTo)
+      if (resetLink) {
+        try {
+          const urlObj = new URL(resetLink)
+          const redirectParam = urlObj.searchParams.get('redirect_to')
+          
+          if (redirectParam && redirectParam !== redirectUrl) {
+            console.warn(`[RESET_PASSWORD] Redirect URL mismatch detected!`, {
+              requested: redirectUrl,
+              actual: redirectParam,
+              message: 'Supabase used a different redirect URL. Fixing it manually.'
+            })
+            
+            // Replace the redirect_to parameter with our correct URL
+            urlObj.searchParams.set('redirect_to', redirectUrl)
+            resetLink = urlObj.toString()
+            
+            console.log(`[RESET_PASSWORD] Fixed link with correct redirect URL: ${resetLink}`)
+          } else if (!redirectParam) {
+            // If no redirect_to param exists, add it
+            urlObj.searchParams.set('redirect_to', redirectUrl)
+            resetLink = urlObj.toString()
+            console.log(`[RESET_PASSWORD] Added redirect_to parameter to link: ${resetLink}`)
+          }
+        } catch (e) {
+          console.error(`[RESET_PASSWORD] Error parsing/fixing link:`, e)
+          // Continue with original link if parsing fails
+        }
+      }
 
       // Important: generateLink should automatically send the email IF email provider is configured
       // If emails are not being sent:
