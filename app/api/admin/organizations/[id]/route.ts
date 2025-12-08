@@ -140,9 +140,10 @@ export async function PATCH(
             { status: 400 }
           );
         }
+        // Use relation API to connect
         updateData.contactUser = { connect: { id: contactUserId } };
       } else {
-        // Disconnect the relation when contactUserId is null or empty
+        // Use relation API to disconnect when contactUserId is null or empty
         updateData.contactUser = { disconnect: true };
       }
     }
