@@ -21,7 +21,7 @@ export default function MembersPage() {
 
     setLoading(true)
     try {
-      const res = await fetch('/api/members', {
+      const res = await fetch('/api/admin/members', {
         headers: {
           'Authorization': `Bearer ${tokenToUse}`
         }
@@ -80,6 +80,7 @@ export default function MembersPage() {
               <tr style={{ backgroundColor: '#f5f5f5' }}>
                 <th style={{ padding: '1rem', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>Name</th>
                 <th style={{ padding: '1rem', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>Email</th>
+                <th style={{ padding: '1rem', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>Organization</th>
                 <th style={{ padding: '1rem', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>Role</th>
                 <th style={{ padding: '1rem', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>Status</th>
                 <th style={{ padding: '1rem', textAlign: 'left', borderBottom: '1px solid #e0e0e0' }}>Bookings</th>
@@ -92,6 +93,7 @@ export default function MembersPage() {
                     <strong>{member.user?.name || 'N/A'}</strong>
                   </td>
                   <td style={{ padding: '1rem' }}>{member.user?.email || 'N/A'}</td>
+                  <td style={{ padding: '1rem' }}>{member.organization?.name || 'N/A'}</td>
                   <td style={{ padding: '1rem' }}>{member.user?.role || 'N/A'}</td>
                   <td style={{ padding: '1rem' }}>
                     <span style={{

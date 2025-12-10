@@ -40,6 +40,11 @@ model Organization {
   smtpFromName  String?
   // Language preference for emails and UI
   language     String? @default("en") // 'en' or 'tr'
+  // Pricing
+  creditPrice      Float?    // Price per credit (used to determine revenue from credits)
+  currency         String?   @default("USD") // Currency code (USD, EUR, TRY, etc.)
+  pricePeriodStart DateTime? // Start date of the current price period
+  pricePeriodEnd   DateTime? // End date of the current price period (null = indefinite)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -51,6 +56,7 @@ model Organization {
   bookings  Booking[]
   instructors Instructor[]
   creditTransactions CreditTransaction[]
+  priceHistory PriceHistory[]
 
   @@index([slug])
   @@index([contactUserId])
@@ -78,6 +84,7 @@ model User {
   instructor     Instructor?
   contactOrganizations Organization[] @relation("OrganizationContact")
   performedCreditTransactions CreditTransaction[] @relation("CreditTransactionPerformedBy")
+  priceHistoryChanges PriceHistory[] @relation("PriceHistoryChangedBy")
 
   @@index([supabaseUserId])
   @@index([organizationId])
@@ -272,4 +279,28 @@ enum CreditTransactionType {
   BOOKING_PAYMENT // Used for booking a class
   REFUND          // Refund for cancelled booking
   ADJUSTMENT      // Manual adjustment/correction
+}
+
+// Price History model to track organization credit price changes
+model PriceHistory {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creditPriceBefore    Float?    // Credit price before change (null for first entry)
+  creditPriceAfter     Float     // Credit price after change
+  currencyBefore String?  // Currency before change
+  currencyAfter  String   // Currency after change
+  effectiveFrom  DateTime @default(now()) // When this price became/will become effective
+  effectiveUntil DateTime? // When this price period ends (null = indefinite or current)
+  changedByUserId String? // User who made the change (admin/tenant_admin)
+  changedBy      User?    @relation("PriceHistoryChangedBy", fields: [changedByUserId], references: [id], onDelete: SetNull)
+  reason         String?  // Optional reason for price change
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([createdAt])
+  @@index([effectiveFrom])
+  @@index([effectiveUntil])
+  @@index([changedByUserId])
+  @@map("price_history")
 }

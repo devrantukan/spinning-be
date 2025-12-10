@@ -99,6 +99,22 @@ export async function PATCH(
       );
     }
 
+    // Get current organization to check existing credit price/currency
+    const existingOrg = await prisma.organization.findUnique({
+      where: { id },
+      select: {
+        creditPrice: true,
+        currency: true,
+      },
+    });
+
+    if (!existingOrg) {
+      return NextResponse.json(
+        { error: "Organization not found" },
+        { status: 404 }
+      );
+    }
+
     const body = await request.json();
     const {
       name,
@@ -125,6 +141,12 @@ export async function PATCH(
       smtpFromName,
       // Language
       language,
+      // Pricing
+      creditPrice,
+      currency,
+      pricePeriodStart,
+      pricePeriodEnd,
+      priceChangeReason,
     } = body;
 
     const updateData: any = {};
@@ -225,9 +247,35 @@ export async function PATCH(
       updateData.slug = slug;
     }
 
-    const organization = await prisma.organization.update({
-      where: { id },
-      data: updateData,
+    // Handle pricing updates
+    const priceChanged = creditPrice !== undefined && creditPrice !== existingOrg.creditPrice;
+    const currencyChanged = currency !== undefined && currency !== existingOrg.currency;
+    
+    if (creditPrice !== undefined) {
+      const price = creditPrice === null || creditPrice === "" ? null : parseFloat(String(creditPrice));
+      updateData.creditPrice = isNaN(price!) ? null : price;
+    }
+    
+    if (currency !== undefined) {
+      updateData.currency = currency || null;
+    }
+    
+    // Handle price period dates
+    if (pricePeriodStart !== undefined) {
+      const periodStart = pricePeriodStart === null || pricePeriodStart === "" ? null : new Date(pricePeriodStart);
+      updateData.pricePeriodStart = periodStart;
+    }
+    
+    if (pricePeriodEnd !== undefined) {
+      const periodEnd = pricePeriodEnd === null || pricePeriodEnd === "" ? null : new Date(pricePeriodEnd);
+      updateData.pricePeriodEnd = periodEnd;
+    }
+
+    // Use transaction to update organization and create price history if price/currency changed
+    const organization = await prisma.$transaction(async (tx) => {
+      const updatedOrg = await tx.organization.update({
+        where: { id },
+        data: updateData,
       include: {
         contactUser: {
           select: {
@@ -246,6 +294,51 @@ export async function PATCH(
           },
         },
       },
+      });
+
+      // Create price history record if credit price or currency changed
+      if (priceChanged || currencyChanged) {
+        const now = new Date();
+        
+        // Update the previous price history record to set its period end to now
+        if (existingOrg.creditPrice !== null) {
+          const previousPriceHistory = await tx.priceHistory.findFirst({
+            where: {
+              organizationId: id,
+              effectiveUntil: null, // Find the current active price record
+            },
+            orderBy: {
+              effectiveFrom: 'desc',
+            },
+          });
+          
+          if (previousPriceHistory) {
+            await tx.priceHistory.update({
+              where: { id: previousPriceHistory.id },
+              data: {
+                effectiveUntil: now, // End the previous price period at the time of change
+              },
+            });
+          }
+        }
+        
+        // Create new price history record
+        await tx.priceHistory.create({
+          data: {
+            organizationId: id,
+            creditPriceBefore: existingOrg.creditPrice,
+            creditPriceAfter: updatedOrg.creditPrice ?? 0,
+            currencyBefore: existingOrg.currency,
+            currencyAfter: updatedOrg.currency || 'USD',
+            effectiveFrom: now,
+            effectiveUntil: updatedOrg.pricePeriodEnd || null,
+            changedByUserId: user.id,
+            reason: priceChangeReason || null,
+          },
+        });
+      }
+
+      return updatedOrg;
     });
 
     return NextResponse.json(organization);

@@ -116,7 +116,7 @@ export async function PATCH(
 
       // Handle credit balance changes
       if (creditBalance !== undefined) {
-        const newBalance = typeof creditBalance === 'number' ? creditBalance : parseFloat(creditBalance) || 0
+        const newBalance = Math.round(typeof creditBalance === 'number' ? creditBalance : parseFloat(creditBalance) || 0)
         
         if (newBalance !== oldBalance) {
           updateData.creditBalance = newBalance
@@ -138,10 +138,10 @@ export async function PATCH(
         }
       } else if (creditChange !== undefined) {
         // Alternative: specify creditChange (positive to add, negative to deduct)
-        const changeAmount = typeof creditChange === 'number' ? creditChange : parseFloat(creditChange) || 0
+        const changeAmount = Math.round(typeof creditChange === 'number' ? creditChange : parseFloat(creditChange) || 0)
         if (changeAmount !== 0) {
-          const newBalance = oldBalance + changeAmount
-          updateData.creditBalance = Math.max(0, newBalance) // Prevent negative balance
+          const newBalance = Math.max(0, Math.round(oldBalance + changeAmount)) // Prevent negative balance and round to integer
+          updateData.creditBalance = newBalance
           
           if (changeAmount > 0) {
             transactionType = 'MANUAL_ADD'
@@ -187,13 +187,14 @@ export async function PATCH(
 
         // Create transaction record if credit balance changed
         if (transactionType && transactionAmount !== null) {
+          const finalBalanceAfter = Math.round((member as any).creditBalance ?? 0)
           await tx.creditTransaction.create({
             data: {
               memberId: member.id,
               organizationId: context.organizationId,
-              amount: transactionAmount * (transactionType === 'MANUAL_ADD' ? 1 : -1),
-              balanceBefore: oldBalance,
-              balanceAfter: (member as any).creditBalance ?? 0,
+              amount: Math.round(transactionAmount) * (transactionType === 'MANUAL_ADD' ? 1 : -1),
+              balanceBefore: Math.round(oldBalance),
+              balanceAfter: finalBalanceAfter,
               type: transactionType as any,
               description: transactionDescription,
               performedByUserId: context.user.id

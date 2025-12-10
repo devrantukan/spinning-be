@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      const finalCreditBalance = typeof creditBalance === 'number' ? creditBalance : parseFloat(creditBalance) || 0
+      const finalCreditBalance = Math.round(typeof creditBalance === 'number' ? creditBalance : parseFloat(creditBalance) || 0)
 
       // Create member and transaction in a transaction
       const result = await prisma.$transaction(async (tx) => {
