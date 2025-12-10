@@ -43,18 +43,18 @@ export default function AdminDashboard() {
 
       const org = await orgRes.json()
 
-      // Fetch counts
+      // Fetch counts - use admin endpoints to get all data across organizations
       const [classesRes, sessionsRes, bookingsRes, membersRes, organizationsRes, instructorsRes] = await Promise.all([
-        fetch(`/api/classes?organizationId=${org.id}`, {
+        fetch('/api/admin/classes', {
           headers: { 'Authorization': `Bearer ${tokenToUse}` }
         }),
-        fetch(`/api/sessions?organizationId=${org.id}`, {
+        fetch('/api/admin/sessions', {
           headers: { 'Authorization': `Bearer ${tokenToUse}` }
         }),
-        fetch(`/api/bookings?organizationId=${org.id}`, {
+        fetch('/api/admin/bookings', {
           headers: { 'Authorization': `Bearer ${tokenToUse}` }
         }),
-        fetch(`/api/members?organizationId=${org.id}`, {
+        fetch('/api/admin/members', {
           headers: { 'Authorization': `Bearer ${tokenToUse}` }
         }),
         fetch('/api/admin/organizations', {
