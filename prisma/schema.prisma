@@ -38,6 +38,8 @@ model Organization {
   smtpPassword String? // Stored encrypted in production
   smtpFromEmail String?
   smtpFromName  String?
+  // Language preference for emails and UI
+  language     String? @default("en") // 'en' or 'tr'
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -48,6 +50,7 @@ model Organization {
   sessions  Session[]
   bookings  Booking[]
   instructors Instructor[]
+  creditTransactions CreditTransaction[]
 
   @@index([slug])
   @@index([contactUserId])
@@ -74,6 +77,7 @@ model User {
   bookings       Booking[]
   instructor     Instructor?
   contactOrganizations Organization[] @relation("OrganizationContact")
+  performedCreditTransactions CreditTransaction[] @relation("CreditTransactionPerformedBy")
 
   @@index([supabaseUserId])
   @@index([organizationId])
@@ -96,12 +100,14 @@ model Member {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   membershipType String?
+  creditBalance  Float    @default(0) // Credit balance for the member
   status         MemberStatus @default(ACTIVE)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   // Relations
   bookings       Booking[]
+  creditTransactions CreditTransaction[]
 
   @@unique([userId, organizationId])
   @@index([organizationId])
@@ -237,3 +243,33 @@ enum BookingStatus {
   COMPLETED
 }
 
+// Credit Transaction model to track all credit balance changes
+model CreditTransaction {
+  id             String   @id @default(uuid())
+  memberId       String
+  member         Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  amount         Float    // Positive for credit added, negative for credit deducted
+  balanceBefore  Float    // Balance before this transaction
+  balanceAfter   Float    // Balance after this transaction
+  type           CreditTransactionType
+  description    String?  // Optional description/reason for the transaction
+  performedByUserId String? // User who performed this transaction (admin/tenant_admin)
+  performedBy    User?    @relation("CreditTransactionPerformedBy", fields: [performedByUserId], references: [id], onDelete: SetNull)
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([memberId])
+  @@index([createdAt])
+  @@index([type])
+  @@map("credit_transactions")
+}
+
+enum CreditTransactionType {
+  MANUAL_ADD      // Manually added by admin
+  MANUAL_DEDUCT   // Manually deducted by admin
+  BOOKING_PAYMENT // Used for booking a class
+  REFUND          // Refund for cancelled booking
+  ADJUSTMENT      // Manual adjustment/correction
+}

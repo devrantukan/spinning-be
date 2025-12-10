@@ -123,6 +123,8 @@ export async function PATCH(
       smtpPassword,
       smtpFromEmail,
       smtpFromName,
+      // Language
+      language,
     } = body;
 
     const updateData: any = {};
@@ -189,6 +191,20 @@ export async function PATCH(
       updateData.smtpFromEmail = smtpFromEmail || null;
     if (smtpFromName !== undefined)
       updateData.smtpFromName = smtpFromName || null;
+    // Language
+    if (language !== undefined) {
+      // Validate language code (only 'en' or 'tr' allowed)
+      if (language === null || language === '') {
+        updateData.language = 'en'; // Default to English
+      } else if (language === 'en' || language === 'tr') {
+        updateData.language = language;
+      } else {
+        return NextResponse.json(
+          { error: 'Invalid language code. Must be "en" or "tr".' },
+          { status: 400 }
+        );
+      }
+    }
 
     if (slug) {
       // Check if slug is already taken by another organization

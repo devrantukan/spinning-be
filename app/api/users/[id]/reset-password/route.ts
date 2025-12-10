@@ -36,6 +36,8 @@ export async function POST(
             smtpPassword: true,
             smtpFromEmail: true,
             smtpFromName: true,
+            // Language
+            language: true,
           }
         }
       }

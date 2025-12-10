@@ -48,6 +48,46 @@ export async function POST(
       )
     }
 
+    // Get organization SMTP settings
+    const organization = await prisma.organization.findUnique({
+      where: { id: dbUser.organizationId },
+      select: {
+        smtpHost: true,
+        smtpPort: true,
+        smtpUser: true,
+        smtpPassword: true,
+        smtpFromEmail: true,
+        smtpFromName: true,
+        name: true,
+        language: true,
+      },
+    })
+
+    // Get TENANT_URL from request header, body, or environment
+    let tenantUrlRaw: string | null = null
+    const tenantUrlFromHeader = request.headers.get('X-Tenant-URL')
+    
+    if (tenantUrlFromHeader) {
+      tenantUrlRaw = tenantUrlFromHeader
+    } else {
+      try {
+        const clonedRequest = request.clone()
+        const body = await clonedRequest.json().catch(() => ({}))
+        if (body && body.tenantUrl) {
+          tenantUrlRaw = body.tenantUrl
+        }
+      } catch (e) {
+        // Body might be empty or already consumed
+      }
+      
+      if (!tenantUrlRaw) {
+        tenantUrlRaw = process.env.TENANT_URL || process.env.NEXT_PUBLIC_SITE_URL || null
+      }
+    }
+    
+    const tenantUrl = tenantUrlRaw ? tenantUrlRaw.replace(/\/$/, '') : null
+    const redirectUrl = tenantUrl ? `${tenantUrl}/accept-invitation` : 'http://localhost:3000/accept-invitation'
+
     // Get Supabase admin client
     const supabase = createServerClient()
 
@@ -56,22 +96,44 @@ export async function POST(
     try {
       const { data, error } = await supabase.auth.admin.getUserById(dbUser.supabaseUserId)
       if (error || !data?.user) {
-        // User might not exist in Supabase yet, try to invite them
-        const { data: inviteData, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(
-          dbUser.email,
-          {
+        // User might not exist in Supabase yet, generate invitation link
+        const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
+          type: 'invite',
+          email: dbUser.email,
+          options: {
+            redirectTo: redirectUrl,
             data: {
               name: dbUser.name || null,
               organizationId: dbUser.organizationId,
               role: dbUser.role,
             },
-          }
+          },
+        })
+
+        if (linkError || !linkData?.properties?.action_link) {
+          console.error('Error generating invitation link:', linkError)
+          return NextResponse.json(
+            { error: `Failed to send invitation: ${linkError?.message || 'Unknown error'}` },
+            { status: 400 }
+          )
+        }
+
+        // Send invitation email via SMTP
+        const { sendInvitationEmail } = await import('@/lib/email')
+        const emailResult = await sendInvitationEmail(
+          dbUser.email,
+          linkData.properties.action_link,
+          dbUser.name || undefined,
+          organization
         )
 
-        if (inviteError) {
-          console.error('Error inviting user:', inviteError)
+        if (!emailResult.success) {
           return NextResponse.json(
-            { error: `Failed to send invitation: ${inviteError.message}` },
+            { 
+              error: 'Invitation link generated but email sending failed',
+              details: emailResult.error,
+              link: linkData.properties.action_link // Return link so admin can send manually
+            },
             { status: 400 }
           )
         }
@@ -79,7 +141,6 @@ export async function POST(
         return NextResponse.json({
           success: true,
           message: 'Invitation sent successfully',
-          user: inviteData.user
         })
       }
       supabaseUser = data.user
@@ -99,55 +160,51 @@ export async function POST(
       )
     }
 
-    // Resend invitation using Supabase Admin API
-    // For users who haven't confirmed, we can use inviteUserByEmail again
-    // Supabase will resend the invitation email if the user already exists
+    // Generate invitation link and send via SMTP
     try {
-      const { data: inviteData, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(
-        dbUser.email,
-        {
+      const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
+        type: 'invite',
+        email: dbUser.email,
+        options: {
+          redirectTo: redirectUrl,
           data: {
             name: dbUser.name || null,
             organizationId: dbUser.organizationId,
             role: dbUser.role,
           },
-        }
+        },
+      })
+
+      if (linkError || !linkData?.properties?.action_link) {
+        return NextResponse.json(
+          { error: `Failed to generate invitation link: ${linkError?.message || 'Unknown error'}` },
+          { status: 400 }
+        )
+      }
+
+      // Send invitation email via SMTP
+      const { sendInvitationEmail } = await import('@/lib/email')
+      const emailResult = await sendInvitationEmail(
+        dbUser.email,
+        linkData.properties.action_link,
+        dbUser.name || undefined,
+        organization
       )
 
-      if (inviteError) {
-        // If invite fails, try using generateLink as fallback
-        console.warn('inviteUserByEmail failed, trying generateLink:', inviteError)
-        
-        const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
-          type: 'invite',
-          email: dbUser.email,
-          options: {
-            data: {
-              name: dbUser.name || null,
-              organizationId: dbUser.organizationId,
-              role: dbUser.role,
-            },
+      if (!emailResult.success) {
+        return NextResponse.json(
+          { 
+            error: 'Invitation link generated but email sending failed',
+            details: emailResult.error,
+            link: linkData.properties.action_link // Return link so admin can send manually
           },
-        })
-
-        if (linkError) {
-          return NextResponse.json(
-            { error: `Failed to resend invitation: ${linkError.message}` },
-            { status: 400 }
-          )
-        }
-
-        return NextResponse.json({
-          success: true,
-          message: 'Invitation link generated successfully',
-          link: linkData.properties?.action_link
-        })
+          { status: 400 }
+        )
       }
 
       return NextResponse.json({
         success: true,
-        message: 'Invitation resent successfully',
-        user: inviteData.user
+        message: 'Invitation resent successfully via SMTP',
       })
     } catch (error: any) {
       console.error('Error resending invitation:', error)

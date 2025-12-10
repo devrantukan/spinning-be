@@ -138,14 +138,15 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Members (acting as tenant admins) and TENANT_ADMIN can only create INSTRUCTOR users
+      // Members (acting as tenant admins) and TENANT_ADMIN can create INSTRUCTOR and MEMBER users
       if (
         (context.user.role === "TENANT_ADMIN" ||
           context.user.role === "MEMBER") &&
-        role !== "INSTRUCTOR"
+        role !== "INSTRUCTOR" &&
+        role !== "MEMBER"
       ) {
         return NextResponse.json(
-          { error: "Forbidden: Tenant admins can only create instructors" },
+          { error: "Forbidden: Tenant admins can only create instructors or members" },
           { status: 403 }
         );
       }
@@ -228,11 +229,11 @@ export async function POST(request: NextRequest) {
         // Continue - allow tenant admins to create instructors even if listing fails
       }
 
-      // If user doesn't exist and tenant admin (or member acting as tenant admin) is creating an instructor, create them in Supabase
+      // If user doesn't exist and tenant admin (or member acting as tenant admin) is creating an instructor or member, create them in Supabase
       const isTenantAdmin =
         context.user.role === "TENANT_ADMIN" || context.user.role === "MEMBER";
       const shouldCreateUser =
-        !supabaseUser && isTenantAdmin && role === "INSTRUCTOR";
+        !supabaseUser && isTenantAdmin && (role === "INSTRUCTOR" || role === "MEMBER");
       console.log(`[CREATE_USER] Checking conditions:`, {
         shouldCreate: shouldCreateUser,
         hasSupabaseUser: !!supabaseUser,
@@ -243,7 +244,7 @@ export async function POST(request: NextRequest) {
 
       if (shouldCreateUser) {
         console.log(
-          `[CREATE_USER] Creating instructor ${email} in Supabase for tenant admin`
+          `[CREATE_USER] Creating ${role.toLowerCase()} ${email} in Supabase for tenant admin`
         );
 
         if (!hasServiceRoleKey) {
@@ -257,67 +258,192 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        // Create user in Supabase and send invitation email
-        const { data: newSupabaseUser, error: inviteError } =
-          await supabase.auth.admin.inviteUserByEmail(email, {
+        // Get organization SMTP settings
+        const organization = await prisma.organization.findUnique({
+          where: { id: context.organizationId },
+          select: {
+            smtpHost: true,
+            smtpPort: true,
+            smtpUser: true,
+            smtpPassword: true,
+            smtpFromEmail: true,
+            smtpFromName: true,
+            name: true,
+            language: true,
+          },
+        })
+
+        // Get TENANT_URL from request header, body, or environment
+        let tenantUrlRaw: string | null = null
+        const tenantUrlFromHeader = req.headers.get('X-Tenant-URL')
+        
+        if (tenantUrlFromHeader) {
+          tenantUrlRaw = tenantUrlFromHeader
+        } else {
+          try {
+            const clonedRequest = req.clone()
+            const body = await clonedRequest.json().catch(() => ({}))
+            if (body && body.tenantUrl) {
+              tenantUrlRaw = body.tenantUrl
+            }
+          } catch (e) {
+            // Body might be empty or already consumed
+          }
+          
+          if (!tenantUrlRaw) {
+            tenantUrlRaw = process.env.TENANT_URL || process.env.NEXT_PUBLIC_SITE_URL || null
+          }
+        }
+        
+        const tenantUrl = tenantUrlRaw ? tenantUrlRaw.replace(/\/$/, '') : null
+        const redirectUrl = tenantUrl ? `${tenantUrl}/accept-invitation` : 'http://localhost:3000/accept-invitation'
+
+        // Generate invitation link using generateLink (instead of inviteUserByEmail)
+        // This gives us the link to send via our SMTP
+        const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
+          type: 'invite',
+          email: email,
+          options: {
+            redirectTo: redirectUrl,
             data: {
               name: name || null,
               organizationId: context.organizationId,
               role: role,
             },
-          });
+          },
+        })
 
-        if (inviteError) {
-          console.error("Error inviting user to Supabase:", inviteError);
-          // Try alternative: create user without email confirmation
-          const { data: createdUser, error: createError } =
-            await supabase.auth.admin.createUser({
-              email,
-              email_confirm: true, // Auto-confirm email so user can set password
-              user_metadata: {
+        if (linkError || !linkData?.properties?.action_link) {
+          console.error('Error generating invitation link:', linkError)
+          // Fallback: try inviteUserByEmail
+          const { data: newSupabaseUser, error: inviteError } =
+            await supabase.auth.admin.inviteUserByEmail(email, {
+              data: {
                 name: name || null,
                 organizationId: context.organizationId,
                 role: role,
               },
-            });
+            })
 
-          if (createError || !createdUser.user) {
-            console.error("Error creating user in Supabase:", createError);
-            return NextResponse.json(
-              {
-                error: "Failed to create user in Supabase",
-                details:
-                  createError?.message ||
-                  inviteError.message ||
-                  "Please ensure SUPABASE_SERVICE_ROLE_KEY is configured",
-              },
-              { status: 400 }
-            );
-          }
-
-          supabaseUser = createdUser.user;
-          console.log(`User created in Supabase: ${supabaseUser.id}`);
-
-          // Send password reset email to allow user to set password
-          try {
-            const { error: resetError } =
-              await supabase.auth.admin.generateLink({
-                type: "recovery",
-                email: email,
+          if (inviteError) {
+            console.error("Error inviting user to Supabase:", inviteError);
+            // Try alternative: create user without email confirmation
+            const { data: createdUser, error: createError } =
+              await supabase.auth.admin.createUser({
+                email,
+                email_confirm: true, // Auto-confirm email so user can set password
+                user_metadata: {
+                  name: name || null,
+                  organizationId: context.organizationId,
+                  role: role,
+                },
               });
 
-            if (resetError) {
-              console.warn("Could not send password reset email:", resetError);
-              // Still continue - user can use password reset from login page
-            } else {
-              console.log(`Password reset email sent to ${email}`);
+            if (createError || !createdUser.user) {
+              console.error("Error creating user in Supabase:", createError);
+              return NextResponse.json(
+                {
+                  error: "Failed to create user in Supabase",
+                  details:
+                    createError?.message ||
+                    inviteError.message ||
+                    "Please ensure SUPABASE_SERVICE_ROLE_KEY is configured",
+                },
+                { status: 400 }
+              );
             }
-          } catch (emailError) {
-            console.warn("Error sending password reset email:", emailError);
+
+            supabaseUser = createdUser.user;
+            console.log(`User created in Supabase: ${supabaseUser.id}`);
+
+            // Generate password reset link and send via SMTP
+            const { data: resetLinkData } = await supabase.auth.admin.generateLink({
+              type: "recovery",
+              email: email,
+              options: { redirectTo: redirectUrl },
+            });
+
+            if (resetLinkData?.properties?.action_link) {
+              const { sendPasswordResetEmail } = await import('@/lib/email')
+              const emailResult = await sendPasswordResetEmail(
+                email,
+                resetLinkData.properties.action_link,
+                name || undefined,
+                organization
+              )
+              
+              if (!emailResult.success) {
+                console.warn('Failed to send password reset email via SMTP:', emailResult.error)
+              }
+            }
+          } else {
+            supabaseUser = newSupabaseUser.user;
+            console.log(`User invited via Supabase: ${supabaseUser.id}`);
           }
         } else {
-          supabaseUser = newSupabaseUser.user;
-          console.log(`User invited via Supabase: ${supabaseUser.id}`);
+          // Successfully generated link - send invitation email via SMTP
+          const invitationLink = linkData.properties.action_link
+          console.log(`[CREATE_USER] Generated invitation link for ${email}`)
+
+          // Send invitation email via SMTP
+          const { sendInvitationEmail } = await import('@/lib/email')
+          const emailResult = await sendInvitationEmail(
+            email,
+            invitationLink,
+            name || undefined,
+            organization
+          )
+
+          if (!emailResult.success) {
+            console.error(`[CREATE_USER] Failed to send invitation email via SMTP:`, emailResult.error)
+            // Still continue - user can be created even if email fails
+          } else {
+            console.log(`[CREATE_USER] Invitation email sent successfully to ${email} via SMTP`)
+          }
+
+          // Create or get user in Supabase
+          // Since we generated a link, the user might not exist yet - create them
+          const { data: createdUser, error: createError } = await supabase.auth.admin.createUser({
+            email,
+            email_confirm: false, // User needs to confirm via invitation link
+            user_metadata: {
+              name: name || null,
+              organizationId: context.organizationId,
+              role: role,
+            },
+          })
+
+          if (createError || !createdUser?.user) {
+            // User might already exist, try to get them by listing users
+            const { data: usersList, error: listError } = await supabase.auth.admin.listUsers()
+            if (!listError && usersList?.users) {
+              const foundUser = usersList.users.find(u => u.email === email)
+              if (foundUser) {
+                supabaseUser = foundUser
+                console.log(`[CREATE_USER] Found existing user in Supabase: ${foundUser.id}`)
+              } else {
+                console.error('Error creating user in Supabase:', createError)
+                return NextResponse.json(
+                  {
+                    error: 'Failed to create user in Supabase',
+                    details: createError?.message || 'Please ensure SUPABASE_SERVICE_ROLE_KEY is configured',
+                  },
+                  { status: 400 }
+                )
+              }
+            } else {
+              console.error('Error creating user in Supabase:', createError)
+              return NextResponse.json(
+                {
+                  error: 'Failed to create user in Supabase',
+                  details: createError?.message || 'Please ensure SUPABASE_SERVICE_ROLE_KEY is configured',
+                },
+                { status: 400 }
+              )
+            }
+          } else {
+            supabaseUser = createdUser.user
+          }
         }
       } else if (!supabaseUser) {
         // For non-tenant-admin or non-instructor creation, user must exist
@@ -435,8 +561,8 @@ export async function POST(request: NextRequest) {
       }
 
       // Log success message about email being sent
-      if (context.user.role === "TENANT_ADMIN" && role === "INSTRUCTOR") {
-        console.log(`Instructor ${email} created and invitation email sent`);
+      if (context.user.role === "TENANT_ADMIN" && (role === "INSTRUCTOR" || role === "MEMBER")) {
+        console.log(`${role} ${email} created and invitation email sent`);
       }
 
       return NextResponse.json(user, { status: 201 });

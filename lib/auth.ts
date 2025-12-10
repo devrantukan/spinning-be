@@ -565,8 +565,13 @@ export async function getAuthUser(
     console.error("[AUTH] Error in getAuthUser:", {
       message: error?.message,
       code: error?.code,
+      stack: error?.stack,
       error: error,
     });
+    // Log the full error for debugging
+    if (error.code === 'P2002') {
+      console.error("[AUTH] Unique constraint violation - user might already exist with different unique field");
+    }
     return null;
   }
 }
