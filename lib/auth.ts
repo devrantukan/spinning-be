@@ -2,6 +2,37 @@ import { NextRequest } from "next/server";
 import { createAuthClient } from "./supabase";
 import { prisma } from "./prisma";
 
+// Temporary organization select to exclude defaultLocationId until migration is applied
+const organizationSelect = {
+  id: true,
+  name: true,
+  slug: true,
+  description: true,
+  address: true,
+  phone: true,
+  website: true,
+  email: true,
+  facebook: true,
+  twitter: true,
+  instagram: true,
+  linkedin: true,
+  tiktok: true,
+  latitude: true,
+  longitude: true,
+  smtpHost: true,
+  smtpPort: true,
+  smtpUser: true,
+  smtpFromEmail: true,
+  smtpFromName: true,
+  language: true,
+  creditPrice: true,
+  currency: true,
+  pricePeriodStart: true,
+  pricePeriodEnd: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
 export interface AuthUser {
   id: string;
   email: string;
@@ -53,7 +84,11 @@ export async function getAuthUser(
       try {
         dbUser = await prisma.user.findUnique({
           where: { supabaseUserId: supabaseUser.id },
-          include: { organization: true },
+          include: { 
+            organization: {
+              select: organizationSelect
+            }
+          },
         });
         break; // Success, exit retry loop
       } catch (error: any) {
@@ -286,7 +321,7 @@ export async function getAuthUser(
                 | "INSTRUCTOR"
                 | "MEMBER",
             },
-            include: { organization: true },
+            include: { organization: { select: organizationSelect } },
           });
           console.log(
             `Created user in database: ${dbUser.id} with role: ${defaultRole}`
@@ -314,7 +349,7 @@ export async function getAuthUser(
               try {
                 dbUser = await prisma.user.findUnique({
                   where: { supabaseUserId: supabaseUser.id },
-                  include: { organization: true },
+                  include: { organization: { select: organizationSelect } },
                 });
                 console.log(
                   `Fetched existing user: ${dbUser?.id}, org: ${dbUser?.organizationId}`
@@ -347,7 +382,7 @@ export async function getAuthUser(
                 dbUser = await prisma.user.update({
                   where: { id: dbUser.id },
                   data: { organizationId: organization.id },
-                  include: { organization: true },
+                  include: { organization: { select: organizationSelect } },
                 });
                 console.log(`Updated user organization to ${organization.id}`);
               } catch (updateError) {
@@ -425,7 +460,7 @@ export async function getAuthUser(
               dbUser = await prisma.user.update({
                 where: { id: dbUser.id },
                 data: { organizationId: requestOrgId },
-                include: { organization: true },
+                include: { organization: { select: organizationSelect } },
               });
               console.log(
                 `[AUTH] Successfully updated user organization to ${requestOrgId}`
@@ -479,7 +514,7 @@ export async function getAuthUser(
             dbUser = await prisma.user.update({
               where: { id: dbUser.id },
               data: { role: metadataRole },
-              include: { organization: true },
+              include: { organization: { select: organizationSelect } },
             });
             break; // Success
           } catch (updateError: any) {

@@ -45,6 +45,9 @@ model Organization {
   currency         String?   @default("USD") // Currency code (USD, EUR, TRY, etc.)
   pricePeriodStart DateTime? // Start date of the current price period
   pricePeriodEnd   DateTime? // End date of the current price period (null = indefinite)
+  // Default location for the organization
+  defaultLocationId String?
+  defaultLocation   Location? @relation("OrganizationDefaultLocation", fields: [defaultLocationId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -57,6 +60,7 @@ model Organization {
   instructors Instructor[]
   creditTransactions CreditTransaction[]
   priceHistory PriceHistory[]
+  locations Location[]
 
   @@index([slug])
   @@index([contactUserId])
@@ -184,6 +188,83 @@ enum ClassStatus {
   ARCHIVED
 }
 
+// Location model (physical locations/studios)
+model Location {
+  id             String   @id @default(uuid())
+  name           String
+  description    String?
+  address        String?
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  isDefault      Boolean  @default(false) // Whether this is the default location
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  seatLayouts    SeatLayout[]
+  sessions       Session[]
+  defaultForOrganizations Organization[] @relation("OrganizationDefaultLocation")
+
+  @@index([organizationId])
+  @@index([isDefault])
+  @@map("locations")
+}
+
+// SeatLayout model (seat layout configuration for a location)
+model SeatLayout {
+  id             String   @id @default(uuid())
+  locationId     String
+  location       Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  name           String   // e.g., "Standard Layout", "VIP Setup"
+  description    String?
+  gridRows       Int?     // Grid rows (e.g., 3 for 3x4 grid)
+  gridColumns    Int?     // Grid columns (e.g., 4 for 3x4 grid)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  seats          Seat[]
+
+  @@index([locationId])
+  @@index([isActive])
+  @@map("seat_layouts")
+}
+
+// Seat model (individual seats in a layout)
+model Seat {
+  id             String   @id @default(uuid())
+  seatLayoutId   String
+  seatLayout     SeatLayout @relation(fields: [seatLayoutId], references: [id], onDelete: Cascade)
+  seatNumber     String   // e.g., "A1", "B5", etc.
+  row            String?  // Optional row identifier
+  column         Int?     // Optional column number
+  type           SeatType @default(NORMAL)
+  creditCost     Int      @default(1) // Cost in credits for booking this seat
+  x              Float?   // X coordinate for visual layout (0-100)
+  y              Float?   // Y coordinate for visual layout (0-100)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  bookings       Booking[]
+
+  @@unique([seatLayoutId, seatNumber])
+  @@index([seatLayoutId])
+  @@index([type])
+  @@index([isActive])
+  @@map("seats")
+}
+
+enum SeatType {
+  NORMAL
+  EXCLUSIVE
+  INSTRUCTOR
+  PODIUM
+  ARCHITECTURAL_COLUMN
+}
+
 // Session model (specific instance of a class at a date/time)
 model Session {
   id             String   @id @default(uuid())
@@ -191,6 +272,8 @@ model Session {
   class          Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  locationId     String?
+  location       Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
   instructorId   String?
   instructor     Instructor? @relation(fields: [instructorId], references: [id], onDelete: SetNull)
   startTime      DateTime
@@ -206,6 +289,7 @@ model Session {
 
   @@index([organizationId])
   @@index([classId])
+  @@index([locationId])
   @@index([instructorId])
   @@index([startTime])
   @@map("sessions")
@@ -229,6 +313,9 @@ model Booking {
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  seatId         String?  // Optional: specific seat booked
+  seat           Seat?    @relation(fields: [seatId], references: [id], onDelete: SetNull)
+  creditCost     Int      @default(1) // Credit cost for this booking (based on seat type)
   status         BookingStatus @default(CONFIRMED)
   checkedIn      Boolean  @default(false)
   checkedInAt    DateTime?
@@ -240,6 +327,7 @@ model Booking {
   @@index([sessionId])
   @@index([memberId])
   @@index([userId])
+  @@index([seatId])
   @@map("bookings")
 }
 

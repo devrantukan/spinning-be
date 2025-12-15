@@ -17,6 +17,7 @@ export async function GET(
         },
         include: {
           class: true,
+          location: true,
           instructor: {
             include: {
               user: {
@@ -81,7 +82,7 @@ export async function PATCH(
       }
 
       const body = await req.json()
-      const { startTime, endTime, instructorId, status, maxCapacity } = body
+      const { startTime, endTime, instructorId, status, maxCapacity, locationId } = body
 
       const updateData: any = {}
       if (startTime) updateData.startTime = new Date(startTime)
@@ -89,6 +90,7 @@ export async function PATCH(
       if (instructorId !== undefined) updateData.instructorId = instructorId
       if (status) updateData.status = status
       if (maxCapacity !== undefined) updateData.maxCapacity = maxCapacity
+      if (locationId !== undefined) updateData.locationId = locationId || null
 
       const session = await prisma.session.updateMany({
         where: {
@@ -109,6 +111,7 @@ export async function PATCH(
         where: { id },
         include: {
           class: true,
+          location: true,
           instructor: {
             include: {
               user: {

@@ -34,6 +34,7 @@ export async function GET(request: NextRequest) {
         where,
         include: {
           class: true,
+          location: true,
           instructor: {
             include: {
               user: {
@@ -80,7 +81,7 @@ export async function POST(request: NextRequest) {
       }
 
       const body = await req.json()
-      const { classId, instructorId, startTime, endTime, maxCapacity } = body
+      const { classId, instructorId, locationId, startTime, endTime, maxCapacity } = body
 
       if (!classId || !startTime || !endTime) {
         return NextResponse.json(
@@ -109,6 +110,7 @@ export async function POST(request: NextRequest) {
           classId,
           organizationId: context.organizationId,
           instructorId: instructorId || null,
+          locationId: locationId || null,
           startTime: new Date(startTime),
           endTime: new Date(endTime),
           maxCapacity: maxCapacity || classExists.maxCapacity,
@@ -117,6 +119,7 @@ export async function POST(request: NextRequest) {
         },
         include: {
           class: true,
+          location: true,
           instructor: {
             include: {
               user: {
