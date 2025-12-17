@@ -61,6 +61,9 @@ model Organization {
   creditTransactions CreditTransaction[]
   priceHistory PriceHistory[]
   locations Location[]
+  packages  Package[]
+  coupons   Coupon[]
+  packageRedemptions PackageRedemption[]
 
   @@index([slug])
   @@index([contactUserId])
@@ -119,10 +122,19 @@ model Member {
   // Relations
   bookings       Booking[]
   creditTransactions CreditTransaction[]
+  packageRedemptions PackageRedemption[]
+  allAccessDailyUsages AllAccessDailyUsage[]
+
+  // Quick reference fields (optional, for performance)
+  isEliteMember  Boolean @default(false)
+  hasAllAccess   Boolean @default(false)
+  allAccessExpiresAt DateTime?
 
   @@unique([userId, organizationId])
   @@index([organizationId])
   @@index([userId])
+  @@index([isEliteMember])
+  @@index([hasAllAccess])
   @@map("members")
 }
 
@@ -319,6 +331,17 @@ model Booking {
   status         BookingStatus @default(CONFIRMED)
   checkedIn      Boolean  @default(false)
   checkedInAt    DateTime?
+  
+  // Package system fields
+  paymentType    String?  // 'CREDIT', 'ALL_ACCESS', 'FRIEND_PASS', 'FREE'
+  packageRedemptionId String?
+  packageRedemption PackageRedemption? @relation("PackageRedemptionBookings", fields: [packageRedemptionId], references: [id], onDelete: SetNull)
+  creditsUsed    Int?     // Number of credits deducted (for credit-based bookings)
+  allAccessDailyUsageId String? @unique
+  allAccessDailyUsage AllAccessDailyUsage? @relation
+  couponCode     String?  // Coupon code used (if any)
+  friendPassRedemption PackageRedemption? @relation("FriendPassBooking")
+  
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -328,6 +351,8 @@ model Booking {
   @@index([memberId])
   @@index([userId])
   @@index([seatId])
+  @@index([paymentType])
+  @@index([packageRedemptionId])
   @@map("bookings")
 }
 
@@ -391,4 +416,201 @@ model PriceHistory {
   @@index([effectiveUntil])
   @@index([changedByUserId])
   @@map("price_history")
+}
+
+// Package model - Standard packages with fixed pricing
+model Package {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  code           String   @unique // e.g., "SINGLE-RIDE", "ELITE-30"
+  name           String
+  nameTr         String?
+  type           PackageType
+  price          Float    // Package price in TL
+  credits        Int?     // Number of credits (null for ALL_ACCESS)
+  pricePerCredit Float?   // Calculated: price / credits
+  
+  // Calculated fields (based on organization.creditPrice)
+  basePrice      Float?   // creditPrice * credits (if applicable)
+  discountAmount Float?   // basePrice - price
+  discountPercentage Float? // (discountAmount / basePrice) * 100
+  
+  description    String?
+  descriptionTr  String?
+  benefits       Json?    // Array of benefits: ["friend_pass", "priority_booking", "elite_badge"]
+  
+  // Validity
+  validFrom      DateTime?
+  validUntil     DateTime?
+  
+  isActive       Boolean  @default(true)
+  displayOrder   Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  packageRedemptions PackageRedemption[]
+  coupons       Coupon[]
+
+  @@index([organizationId])
+  @@index([code])
+  @@index([type])
+  @@index([isActive])
+  @@map("packages")
+}
+
+enum PackageType {
+  SINGLE_RIDE
+  CREDIT_PACK
+  ELITE_30
+  ALL_ACCESS
+}
+
+// Coupon model - Flexible promotional codes
+model Coupon {
+  id             String   @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  code           String   @unique // e.g., "SUMMER2024", "PROMO-ABC123"
+  name           String
+  nameTr         String?
+  description    String?
+  descriptionTr String?
+  
+  couponType     CouponType
+  
+  // For package coupons
+  packageId      String?
+  package        Package? @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  customPrice    Float?
+  customCredits  Int?
+  
+  // For discount coupons
+  discountType   DiscountType?
+  discountValue  Float?    // 10 for 10%, or 500 for 500 TL
+  applicablePackageIds String[] // Which packages this applies to
+  
+  // For credit bonus coupons
+  bonusCredits   Int?
+  
+  // Validity
+  validFrom      DateTime?
+  validUntil     DateTime?
+  maxRedemptions Int?     // NULL = unlimited
+  maxRedemptionsPerMember Int @default(1)
+  isActive       Boolean  @default(true)
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  packageRedemptions PackageRedemption[]
+
+  @@index([organizationId])
+  @@index([code])
+  @@index([isActive])
+  @@map("coupons")
+}
+
+enum CouponType {
+  DISCOUNT
+  PACKAGE
+  CREDIT_BONUS
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+// PackageRedemption model - Unified redemption tracking
+model PackageRedemption {
+  id             String   @id @default(uuid())
+  memberId       String
+  member         Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  // Can be either Package or Coupon
+  packageId     String?
+  package        Package? @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  couponId       String?
+  coupon         Coupon?  @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  
+  // Redemption details
+  redemptionType RedemptionType
+  redeemedAt     DateTime @default(now())
+  redeemedBy     String?  // User ID who redeemed (admin)
+  
+  // Pricing
+  originalPrice  Float
+  discountAmount Float    @default(0)
+  finalPrice     Float
+  
+  // What was granted
+  creditsAdded  Int?
+  allAccessExpiresAt DateTime?
+  allAccessDays Int?
+  
+  // For ELITE_30 packages
+  friendPassAvailable Boolean @default(false)
+  friendPassExpiresAt DateTime?
+  friendPassUsed Boolean @default(false)
+  friendPassUsedAt DateTime?
+  friendPassBookingId String? @unique
+  friendPassBooking Booking? @relation("FriendPassBooking", fields: [friendPassBookingId], references: [id], onDelete: SetNull)
+  
+  // Status
+  status        RedemptionStatus @default(PENDING)
+  
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  bookings      Booking[] @relation("PackageRedemptionBookings")
+  allAccessDailyUsages AllAccessDailyUsage[]
+
+  @@index([organizationId])
+  @@index([memberId])
+  @@index([packageId])
+  @@index([couponId])
+  @@index([status])
+  @@index([allAccessExpiresAt])
+  @@index([friendPassExpiresAt])
+  @@map("package_redemptions")
+}
+
+enum RedemptionType {
+  PACKAGE_DIRECT
+  COUPON_PACKAGE
+  COUPON_DISCOUNT
+}
+
+enum RedemptionStatus {
+  PENDING
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  USED
+}
+
+// AllAccessDailyUsage model - Track daily usage for All Access packages
+model AllAccessDailyUsage {
+  id                 String   @id @default(uuid())
+  packageRedemptionId String
+  packageRedemption  PackageRedemption @relation(fields: [packageRedemptionId], references: [id], onDelete: Cascade)
+  memberId           String
+  member             Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  usageDate          DateTime @db.Date // YYYY-MM-DD
+  bookingId          String? @unique
+  booking            Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  wasNoShow          Boolean  @default(false)
+  createdAt          DateTime @default(now())
+
+  @@unique([packageRedemptionId, usageDate])
+  @@index([memberId])
+  @@index([usageDate])
+  @@map("all_access_daily_usage")
 }
