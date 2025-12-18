@@ -45,6 +45,13 @@ model Organization {
   currency         String?   @default("USD") // Currency code (USD, EUR, TRY, etc.)
   pricePeriodStart DateTime? // Start date of the current price period
   pricePeriodEnd   DateTime? // End date of the current price period (null = indefinite)
+  // Bank Account
+  bankAccountName  String?   // Account holder name
+  bankName         String?   // Bank name
+  bankAccountNumber String?  // Account number
+  bankIban         String?   // IBAN
+  bankSwift        String?   // SWIFT/BIC code
+  bankBranch       String?   // Branch name or code
   // Default location for the organization
   defaultLocationId String?
   defaultLocation   Location? @relation("OrganizationDefaultLocation", fields: [defaultLocationId], references: [id], onDelete: SetNull)

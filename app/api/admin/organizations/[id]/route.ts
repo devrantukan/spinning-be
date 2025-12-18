@@ -147,6 +147,13 @@ export async function PATCH(
       pricePeriodStart,
       pricePeriodEnd,
       priceChangeReason,
+      // Bank Account
+      bankAccountName,
+      bankName,
+      bankAccountNumber,
+      bankIban,
+      bankSwift,
+      bankBranch,
     } = body;
 
     const updateData: any = {};
@@ -216,9 +223,9 @@ export async function PATCH(
     // Language
     if (language !== undefined) {
       // Validate language code (only 'en' or 'tr' allowed)
-      if (language === null || language === '') {
-        updateData.language = 'en'; // Default to English
-      } else if (language === 'en' || language === 'tr') {
+      if (language === null || language === "") {
+        updateData.language = "en"; // Default to English
+      } else if (language === "en" || language === "tr") {
         updateData.language = language;
       } else {
         return NextResponse.json(
@@ -248,58 +255,79 @@ export async function PATCH(
     }
 
     // Handle pricing updates
-    const priceChanged = creditPrice !== undefined && creditPrice !== existingOrg.creditPrice;
-    const currencyChanged = currency !== undefined && currency !== existingOrg.currency;
-    
+    const priceChanged =
+      creditPrice !== undefined && creditPrice !== existingOrg.creditPrice;
+    const currencyChanged =
+      currency !== undefined && currency !== existingOrg.currency;
+
     if (creditPrice !== undefined) {
-      const price = creditPrice === null || creditPrice === "" ? null : parseFloat(String(creditPrice));
+      const price =
+        creditPrice === null || creditPrice === ""
+          ? null
+          : parseFloat(String(creditPrice));
       updateData.creditPrice = isNaN(price!) ? null : price;
     }
-    
+
     if (currency !== undefined) {
       updateData.currency = currency || null;
     }
-    
+
     // Handle price period dates
     if (pricePeriodStart !== undefined) {
-      const periodStart = pricePeriodStart === null || pricePeriodStart === "" ? null : new Date(pricePeriodStart);
+      const periodStart =
+        pricePeriodStart === null || pricePeriodStart === ""
+          ? null
+          : new Date(pricePeriodStart);
       updateData.pricePeriodStart = periodStart;
     }
-    
+
     if (pricePeriodEnd !== undefined) {
-      const periodEnd = pricePeriodEnd === null || pricePeriodEnd === "" ? null : new Date(pricePeriodEnd);
+      const periodEnd =
+        pricePeriodEnd === null || pricePeriodEnd === ""
+          ? null
+          : new Date(pricePeriodEnd);
       updateData.pricePeriodEnd = periodEnd;
     }
+
+    // Bank Account fields
+    if (bankAccountName !== undefined)
+      updateData.bankAccountName = bankAccountName || null;
+    if (bankName !== undefined) updateData.bankName = bankName || null;
+    if (bankAccountNumber !== undefined)
+      updateData.bankAccountNumber = bankAccountNumber || null;
+    if (bankIban !== undefined) updateData.bankIban = bankIban || null;
+    if (bankSwift !== undefined) updateData.bankSwift = bankSwift || null;
+    if (bankBranch !== undefined) updateData.bankBranch = bankBranch || null;
 
     // Use transaction to update organization and create price history if price/currency changed
     const organization = await prisma.$transaction(async (tx) => {
       const updatedOrg = await tx.organization.update({
         where: { id },
         data: updateData,
-      include: {
-        contactUser: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
+        include: {
+          contactUser: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          _count: {
+            select: {
+              users: true,
+              members: true,
+              classes: true,
+              sessions: true,
+              bookings: true,
+            },
           },
         },
-        _count: {
-          select: {
-            users: true,
-            members: true,
-            classes: true,
-            sessions: true,
-            bookings: true,
-          },
-        },
-      },
       });
 
       // Create price history record if credit price or currency changed
       if (priceChanged || currencyChanged) {
         const now = new Date();
-        
+
         // Update the previous price history record to set its period end to now
         if (existingOrg.creditPrice !== null) {
           const previousPriceHistory = await tx.priceHistory.findFirst({
@@ -308,10 +336,10 @@ export async function PATCH(
               effectiveUntil: null, // Find the current active price record
             },
             orderBy: {
-              effectiveFrom: 'desc',
+              effectiveFrom: "desc",
             },
           });
-          
+
           if (previousPriceHistory) {
             await tx.priceHistory.update({
               where: { id: previousPriceHistory.id },
@@ -321,7 +349,7 @@ export async function PATCH(
             });
           }
         }
-        
+
         // Create new price history record
         await tx.priceHistory.create({
           data: {
@@ -329,7 +357,7 @@ export async function PATCH(
             creditPriceBefore: existingOrg.creditPrice,
             creditPriceAfter: updatedOrg.creditPrice ?? 0,
             currencyBefore: existingOrg.currency,
-            currencyAfter: updatedOrg.currency || 'USD',
+            currencyAfter: updatedOrg.currency || "USD",
             effectiveFrom: now,
             effectiveUntil: updatedOrg.pricePeriodEnd || null,
             changedByUserId: user.id,
