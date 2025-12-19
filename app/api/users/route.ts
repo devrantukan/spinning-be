@@ -146,7 +146,10 @@ export async function POST(request: NextRequest) {
         role !== "MEMBER"
       ) {
         return NextResponse.json(
-          { error: "Forbidden: Tenant admins can only create instructors or members" },
+          {
+            error:
+              "Forbidden: Tenant admins can only create instructors or members",
+          },
           { status: 403 }
         );
       }
@@ -233,7 +236,9 @@ export async function POST(request: NextRequest) {
       const isTenantAdmin =
         context.user.role === "TENANT_ADMIN" || context.user.role === "MEMBER";
       const shouldCreateUser =
-        !supabaseUser && isTenantAdmin && (role === "INSTRUCTOR" || role === "MEMBER");
+        !supabaseUser &&
+        isTenantAdmin &&
+        (role === "INSTRUCTOR" || role === "MEMBER");
       console.log(`[CREATE_USER] Checking conditions:`, {
         shouldCreate: shouldCreateUser,
         hasSupabaseUser: !!supabaseUser,
@@ -271,50 +276,56 @@ export async function POST(request: NextRequest) {
             name: true,
             language: true,
           },
-        })
+        });
 
         // Get TENANT_URL from request header, body, or environment
-        let tenantUrlRaw: string | null = null
-        const tenantUrlFromHeader = req.headers.get('X-Tenant-URL')
-        
+        let tenantUrlRaw: string | null = null;
+        const tenantUrlFromHeader = req.headers.get("X-Tenant-URL");
+
         if (tenantUrlFromHeader) {
-          tenantUrlRaw = tenantUrlFromHeader
+          tenantUrlRaw = tenantUrlFromHeader;
         } else {
           try {
-            const clonedRequest = req.clone()
-            const body = await clonedRequest.json().catch(() => ({}))
+            const clonedRequest = req.clone();
+            const body = await clonedRequest.json().catch(() => ({}));
             if (body && body.tenantUrl) {
-              tenantUrlRaw = body.tenantUrl
+              tenantUrlRaw = body.tenantUrl;
             }
           } catch (e) {
             // Body might be empty or already consumed
           }
-          
+
           if (!tenantUrlRaw) {
-            tenantUrlRaw = process.env.TENANT_URL || process.env.NEXT_PUBLIC_SITE_URL || null
+            tenantUrlRaw =
+              process.env.TENANT_URL ||
+              process.env.NEXT_PUBLIC_SITE_URL ||
+              null;
           }
         }
-        
-        const tenantUrl = tenantUrlRaw ? tenantUrlRaw.replace(/\/$/, '') : null
-        const redirectUrl = tenantUrl ? `${tenantUrl}/accept-invitation` : 'http://localhost:3000/accept-invitation'
+
+        const tenantUrl = tenantUrlRaw ? tenantUrlRaw.replace(/\/$/, "") : null;
+        const redirectUrl = tenantUrl
+          ? `${tenantUrl}/accept-invitation`
+          : "http://localhost:3000/accept-invitation";
 
         // Generate invitation link using generateLink (instead of inviteUserByEmail)
         // This gives us the link to send via our SMTP
-        const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
-          type: 'invite',
-          email: email,
-          options: {
-            redirectTo: redirectUrl,
-            data: {
-              name: name || null,
-              organizationId: context.organizationId,
-              role: role,
+        const { data: linkData, error: linkError } =
+          await supabase.auth.admin.generateLink({
+            type: "invite",
+            email: email,
+            options: {
+              redirectTo: redirectUrl,
+              data: {
+                name: name || null,
+                organizationId: context.organizationId,
+                role: role,
+              },
             },
-          },
-        })
+          });
 
         if (linkError || !linkData?.properties?.action_link) {
-          console.error('Error generating invitation link:', linkError)
+          console.error("Error generating invitation link:", linkError);
           // Fallback: try inviteUserByEmail
           const { data: newSupabaseUser, error: inviteError } =
             await supabase.auth.admin.inviteUserByEmail(email, {
@@ -323,7 +334,7 @@ export async function POST(request: NextRequest) {
                 organizationId: context.organizationId,
                 role: role,
               },
-            })
+            });
 
           if (inviteError) {
             console.error("Error inviting user to Supabase:", inviteError);
@@ -357,23 +368,27 @@ export async function POST(request: NextRequest) {
             console.log(`User created in Supabase: ${supabaseUser.id}`);
 
             // Generate password reset link and send via SMTP
-            const { data: resetLinkData } = await supabase.auth.admin.generateLink({
-              type: "recovery",
-              email: email,
-              options: { redirectTo: redirectUrl },
-            });
+            const { data: resetLinkData } =
+              await supabase.auth.admin.generateLink({
+                type: "recovery",
+                email: email,
+                options: { redirectTo: redirectUrl },
+              });
 
             if (resetLinkData?.properties?.action_link) {
-              const { sendPasswordResetEmail } = await import('@/lib/email')
+              const { sendPasswordResetEmail } = await import("@/lib/email");
               const emailResult = await sendPasswordResetEmail(
                 email,
                 resetLinkData.properties.action_link,
                 name || undefined,
                 organization
-              )
-              
+              );
+
               if (!emailResult.success) {
-                console.warn('Failed to send password reset email via SMTP:', emailResult.error)
+                console.warn(
+                  "Failed to send password reset email via SMTP:",
+                  emailResult.error
+                );
               }
             }
           } else {
@@ -382,67 +397,80 @@ export async function POST(request: NextRequest) {
           }
         } else {
           // Successfully generated link - send invitation email via SMTP
-          const invitationLink = linkData.properties.action_link
-          console.log(`[CREATE_USER] Generated invitation link for ${email}`)
+          const invitationLink = linkData.properties.action_link;
+          console.log(`[CREATE_USER] Generated invitation link for ${email}`);
 
           // Send invitation email via SMTP
-          const { sendInvitationEmail } = await import('@/lib/email')
+          const { sendInvitationEmail } = await import("@/lib/email");
           const emailResult = await sendInvitationEmail(
             email,
             invitationLink,
             name || undefined,
             organization
-          )
+          );
 
           if (!emailResult.success) {
-            console.error(`[CREATE_USER] Failed to send invitation email via SMTP:`, emailResult.error)
+            console.error(
+              `[CREATE_USER] Failed to send invitation email via SMTP:`,
+              emailResult.error
+            );
             // Still continue - user can be created even if email fails
           } else {
-            console.log(`[CREATE_USER] Invitation email sent successfully to ${email} via SMTP`)
+            console.log(
+              `[CREATE_USER] Invitation email sent successfully to ${email} via SMTP`
+            );
           }
 
           // Create or get user in Supabase
           // Since we generated a link, the user might not exist yet - create them
-          const { data: createdUser, error: createError } = await supabase.auth.admin.createUser({
-            email,
-            email_confirm: false, // User needs to confirm via invitation link
-            user_metadata: {
-              name: name || null,
-              organizationId: context.organizationId,
-              role: role,
-            },
-          })
+          const { data: createdUser, error: createError } =
+            await supabase.auth.admin.createUser({
+              email,
+              email_confirm: false, // User needs to confirm via invitation link
+              user_metadata: {
+                name: name || null,
+                organizationId: context.organizationId,
+                role: role,
+              },
+            });
 
           if (createError || !createdUser?.user) {
             // User might already exist, try to get them by listing users
-            const { data: usersList, error: listError } = await supabase.auth.admin.listUsers()
+            const { data: usersList, error: listError } =
+              await supabase.auth.admin.listUsers();
             if (!listError && usersList?.users) {
-              const foundUser = usersList.users.find(u => u.email === email)
+              const foundUser = usersList.users.find((u) => u.email === email);
               if (foundUser) {
-                supabaseUser = foundUser
-                console.log(`[CREATE_USER] Found existing user in Supabase: ${foundUser.id}`)
+                supabaseUser = foundUser;
+                console.log(
+                  `[CREATE_USER] Found existing user in Supabase: ${foundUser.id}`
+                );
               } else {
-                console.error('Error creating user in Supabase:', createError)
+                console.error("Error creating user in Supabase:", createError);
                 return NextResponse.json(
                   {
-                    error: 'Failed to create user in Supabase',
-                    details: createError?.message || 'Please ensure SUPABASE_SERVICE_ROLE_KEY is configured',
+                    error: "Failed to create user in Supabase",
+                    details:
+                      createError?.message ||
+                      "Please ensure SUPABASE_SERVICE_ROLE_KEY is configured",
                   },
                   { status: 400 }
-                )
+                );
               }
             } else {
-              console.error('Error creating user in Supabase:', createError)
+              console.error("Error creating user in Supabase:", createError);
               return NextResponse.json(
                 {
-                  error: 'Failed to create user in Supabase',
-                  details: createError?.message || 'Please ensure SUPABASE_SERVICE_ROLE_KEY is configured',
+                  error: "Failed to create user in Supabase",
+                  details:
+                    createError?.message ||
+                    "Please ensure SUPABASE_SERVICE_ROLE_KEY is configured",
                 },
                 { status: 400 }
-              )
+              );
             }
           } else {
-            supabaseUser = createdUser.user
+            supabaseUser = createdUser.user;
           }
         }
       } else if (!supabaseUser) {
@@ -482,6 +510,43 @@ export async function POST(request: NextRequest) {
       });
 
       if (userInOtherOrg) {
+        // Extract additional user metadata from Supabase user
+        const userMetadata = supabaseUser.user_metadata || {};
+        const dateOfBirth = userMetadata.dob
+          ? new Date(userMetadata.dob)
+          : null;
+        const mobilePhone = userMetadata.mobilePhone || null;
+        const countryCode = userMetadata.countryCode || null;
+
+        // Parse TOC and liability waiver acceptance
+        let tocAcceptedAt: Date | null = null;
+        let liabilityWaiverAcceptedAt: Date | null = null;
+        if (userMetadata.tocAcceptedAt) {
+          try {
+            tocAcceptedAt = new Date(userMetadata.tocAcceptedAt);
+            if (isNaN(tocAcceptedAt.getTime())) tocAcceptedAt = null;
+          } catch (e) {
+            console.warn(
+              "Invalid TOC accepted date:",
+              userMetadata.tocAcceptedAt
+            );
+          }
+        }
+        if (userMetadata.liabilityWaiverAcceptedAt) {
+          try {
+            liabilityWaiverAcceptedAt = new Date(
+              userMetadata.liabilityWaiverAcceptedAt
+            );
+            if (isNaN(liabilityWaiverAcceptedAt.getTime()))
+              liabilityWaiverAcceptedAt = null;
+          } catch (e) {
+            console.warn(
+              "Invalid liability waiver accepted date:",
+              userMetadata.liabilityWaiverAcceptedAt
+            );
+          }
+        }
+
         // Update user's organization
         const updatedUser = await prisma.user.update({
           where: { id: userInOtherOrg.id },
@@ -489,6 +554,26 @@ export async function POST(request: NextRequest) {
             organizationId: context.organizationId,
             role: role as any,
             name: name || userInOtherOrg.name,
+            dateOfBirth:
+              dateOfBirth !== null ? dateOfBirth : userInOtherOrg.dateOfBirth,
+            mobilePhone: mobilePhone || userInOtherOrg.mobilePhone,
+            countryCode: countryCode || userInOtherOrg.countryCode,
+            tocAccepted:
+              userMetadata.tocAccepted !== undefined
+                ? userMetadata.tocAccepted
+                : userInOtherOrg.tocAccepted,
+            tocAcceptedAt:
+              tocAcceptedAt !== null
+                ? tocAcceptedAt
+                : userInOtherOrg.tocAcceptedAt,
+            liabilityWaiverAccepted:
+              userMetadata.liabilityWaiverAccepted !== undefined
+                ? userMetadata.liabilityWaiverAccepted
+                : userInOtherOrg.liabilityWaiverAccepted,
+            liabilityWaiverAcceptedAt:
+              liabilityWaiverAcceptedAt !== null
+                ? liabilityWaiverAcceptedAt
+                : userInOtherOrg.liabilityWaiverAcceptedAt,
           },
           include: {
             organization: {
@@ -509,12 +594,21 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(updatedUser, { status: 200 });
       }
 
+      // Extract additional user metadata from Supabase user
+      const userMetadata = supabaseUser.user_metadata || {};
+      const dateOfBirth = userMetadata.dob ? new Date(userMetadata.dob) : null;
+      const mobilePhone = userMetadata.mobilePhone || null;
+      const countryCode = userMetadata.countryCode || null;
+
       // Create new user in database
       const user = await prisma.user.create({
         data: {
           supabaseUserId: supabaseUser.id,
           email,
-          name: name || null,
+          name: name || userMetadata.name || null,
+          dateOfBirth: dateOfBirth,
+          mobilePhone: mobilePhone,
+          countryCode: countryCode,
           role: role as any,
           organizationId: context.organizationId,
         },
@@ -561,7 +655,10 @@ export async function POST(request: NextRequest) {
       }
 
       // Log success message about email being sent
-      if (context.user.role === "TENANT_ADMIN" && (role === "INSTRUCTOR" || role === "MEMBER")) {
+      if (
+        context.user.role === "TENANT_ADMIN" &&
+        (role === "INSTRUCTOR" || role === "MEMBER")
+      ) {
         console.log(`${role} ${email} created and invitation email sent`);
       }
 

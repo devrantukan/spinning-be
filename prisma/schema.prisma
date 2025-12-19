@@ -84,6 +84,13 @@ model User {
   supabaseUserId String   @unique // This links to auth.users.id in Supabase
   email          String
   name           String?
+  dateOfBirth    DateTime? // Date of birth from registration form
+  mobilePhone    String?   // Mobile phone number (with country code)
+  countryCode    String?   // Country code (e.g., "+90", "+1")
+  tocAccepted    Boolean  @default(false) // Terms of Conditions acceptance
+  tocAcceptedAt  DateTime? // When TOC was accepted
+  liabilityWaiverAccepted Boolean @default(false) // Liability waiver acceptance
+  liabilityWaiverAcceptedAt DateTime? // When liability waiver was accepted
   role           UserRole @default(MEMBER)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
