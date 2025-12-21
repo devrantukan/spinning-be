@@ -155,6 +155,3 @@ export async function DELETE(
     }
   });
 }
-
-
-

@@ -1,71 +1,76 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { withOrganizationContext } from '@/lib/middleware'
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { withOrganizationContext } from "@/lib/middleware";
 
 // GET /api/sessions - Get all sessions for the organization
+// Public endpoint - authentication is optional
 export async function GET(request: NextRequest) {
-  return withOrganizationContext(request, async (req, context) => {
-    try {
-      const { searchParams } = req.nextUrl
-      const startDate = searchParams.get('startDate')
-      const endDate = searchParams.get('endDate')
-      const classId = searchParams.get('classId')
-      const status = searchParams.get('status')
+  return withOrganizationContext(
+    request,
+    async (req, context) => {
+      try {
+        const { searchParams } = req.nextUrl;
+        const startDate = searchParams.get("startDate");
+        const endDate = searchParams.get("endDate");
+        const classId = searchParams.get("classId");
+        const status = searchParams.get("status");
 
-      const where: any = {
-        organizationId: context.organizationId
-      }
+        const where: any = {
+          organizationId: context.organizationId,
+        };
 
-      if (startDate || endDate) {
-        where.startTime = {}
-        if (startDate) where.startTime.gte = new Date(startDate)
-        if (endDate) where.startTime.lte = new Date(endDate)
-      }
-
-      if (classId) {
-        where.classId = classId
-      }
-
-      if (status) {
-        where.status = status
-      }
-
-      const sessions = await prisma.session.findMany({
-        where,
-        include: {
-          class: true,
-          location: true,
-          instructor: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true
-                }
-              }
-            }
-          },
-          _count: {
-            select: {
-              bookings: true
-            }
-          }
-        },
-        orderBy: {
-          startTime: 'asc'
+        if (startDate || endDate) {
+          where.startTime = {};
+          if (startDate) where.startTime.gte = new Date(startDate);
+          if (endDate) where.startTime.lte = new Date(endDate);
         }
-      })
 
-      return NextResponse.json(sessions)
-    } catch (error) {
-      console.error('Error fetching sessions:', error)
-      return NextResponse.json(
-        { error: 'Internal server error' },
-        { status: 500 }
-      )
-    }
-  })
+        if (classId) {
+          where.classId = classId;
+        }
+
+        if (status) {
+          where.status = status;
+        }
+
+        const sessions = await prisma.session.findMany({
+          where,
+          include: {
+            class: true,
+            location: true,
+            instructor: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                  },
+                },
+              },
+            },
+            _count: {
+              select: {
+                bookings: true,
+              },
+            },
+          },
+          orderBy: {
+            startTime: "asc",
+          },
+        });
+
+        return NextResponse.json(sessions);
+      } catch (error) {
+        console.error("Error fetching sessions:", error);
+        return NextResponse.json(
+          { error: "Internal server error" },
+          { status: 500 }
+        );
+      }
+    },
+    { requireAuth: false } // Make GET endpoint public
+  );
 }
 
 // POST /api/sessions - Create a new session
@@ -73,36 +78,49 @@ export async function POST(request: NextRequest) {
   return withOrganizationContext(request, async (req, context) => {
     try {
       // Check if user has permission to create sessions
-      if (context.user.role !== 'ADMIN' && context.user.role !== 'TENANT_ADMIN' && context.user.role !== 'INSTRUCTOR') {
+      if (
+        context.user.role !== "ADMIN" &&
+        context.user.role !== "TENANT_ADMIN" &&
+        context.user.role !== "INSTRUCTOR"
+      ) {
         return NextResponse.json(
-          { error: 'Forbidden: Only admins and instructors can create sessions' },
+          {
+            error: "Forbidden: Only admins and instructors can create sessions",
+          },
           { status: 403 }
-        )
+        );
       }
 
-      const body = await req.json()
-      const { classId, instructorId, locationId, startTime, endTime, maxCapacity } = body
+      const body = await req.json();
+      const {
+        classId,
+        instructorId,
+        locationId,
+        startTime,
+        endTime,
+        maxCapacity,
+      } = body;
 
       if (!classId || !startTime || !endTime) {
         return NextResponse.json(
-          { error: 'Missing required fields: classId, startTime, endTime' },
+          { error: "Missing required fields: classId, startTime, endTime" },
           { status: 400 }
-        )
+        );
       }
 
       // Verify class belongs to organization
       const classExists = await prisma.class.findFirst({
         where: {
           id: classId,
-          organizationId: context.organizationId
-        }
-      })
+          organizationId: context.organizationId,
+        },
+      });
 
       if (!classExists) {
         return NextResponse.json(
-          { error: 'Class not found or does not belong to organization' },
+          { error: "Class not found or does not belong to organization" },
           { status: 404 }
-        )
+        );
       }
 
       const session = await prisma.session.create({
@@ -115,7 +133,7 @@ export async function POST(request: NextRequest) {
           endTime: new Date(endTime),
           maxCapacity: maxCapacity || classExists.maxCapacity,
           currentBookings: 0,
-          status: 'SCHEDULED'
+          status: "SCHEDULED",
         },
         include: {
           class: true,
@@ -126,23 +144,21 @@ export async function POST(request: NextRequest) {
                 select: {
                   id: true,
                   name: true,
-                  email: true
-                }
-              }
-            }
-          }
-        }
-      })
+                  email: true,
+                },
+              },
+            },
+          },
+        },
+      });
 
-      return NextResponse.json(session, { status: 201 })
+      return NextResponse.json(session, { status: 201 });
     } catch (error) {
-      console.error('Error creating session:', error)
+      console.error("Error creating session:", error);
       return NextResponse.json(
-        { error: 'Internal server error' },
+        { error: "Internal server error" },
         { status: 500 }
-      )
+      );
     }
-  })
+  });
 }
-
-

@@ -68,6 +68,3 @@ export async function GET(
     }
   });
 }
-
-
-

@@ -64,6 +64,3 @@ export async function GET(
     }
   });
 }
-
-
-

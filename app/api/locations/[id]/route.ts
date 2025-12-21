@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { withOrganizationContext } from '@/lib/middleware'
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { withOrganizationContext } from "@/lib/middleware";
 
 // GET /api/locations/[id] - Get a specific location
 export async function GET(
@@ -9,49 +9,46 @@ export async function GET(
 ) {
   return withOrganizationContext(request, async (req, context) => {
     try {
-      const { id } = await params
+      const { id } = await params;
 
       const location = await prisma.location.findFirst({
         where: {
           id,
-          organizationId: context.organizationId
+          organizationId: context.organizationId,
         },
         include: {
           seatLayouts: {
             include: {
               seats: {
-                orderBy: [
-                  { row: 'asc' },
-                  { column: 'asc' }
-                ]
-              }
-            }
+                orderBy: [{ row: "asc" }, { column: "asc" }],
+              },
+            },
           },
           _count: {
             select: {
               sessions: true,
-              seatLayouts: true
-            }
-          }
-        }
-      })
+              seatLayouts: true,
+            },
+          },
+        },
+      });
 
       if (!location) {
         return NextResponse.json(
-          { error: 'Location not found' },
+          { error: "Location not found" },
           { status: 404 }
-        )
+        );
       }
 
-      return NextResponse.json(location)
+      return NextResponse.json(location);
     } catch (error) {
-      console.error('Error fetching location:', error)
+      console.error("Error fetching location:", error);
       return NextResponse.json(
-        { error: 'Internal server error' },
+        { error: "Internal server error" },
         { status: 500 }
-      )
+      );
     }
-  })
+  });
 }
 
 // PATCH /api/locations/[id] - Update a location
@@ -62,32 +59,35 @@ export async function PATCH(
   return withOrganizationContext(request, async (req, context) => {
     try {
       // Check permissions
-      if (context.user.role !== 'ADMIN' && context.user.role !== 'TENANT_ADMIN') {
+      if (
+        context.user.role !== "ADMIN" &&
+        context.user.role !== "TENANT_ADMIN"
+      ) {
         return NextResponse.json(
-          { error: 'Forbidden: Only admins can update locations' },
+          { error: "Forbidden: Only admins can update locations" },
           { status: 403 }
-        )
+        );
       }
 
-      const { id } = await params
-      const body = await req.json()
+      const { id } = await params;
+      const body = await req.json();
 
       // Verify location belongs to organization
       const existingLocation = await prisma.location.findFirst({
         where: {
           id,
-          organizationId: context.organizationId
-        }
-      })
+          organizationId: context.organizationId,
+        },
+      });
 
       if (!existingLocation) {
         return NextResponse.json(
-          { error: 'Location not found' },
+          { error: "Location not found" },
           { status: 404 }
-        )
+        );
       }
 
-      const { name, description, address, isDefault } = body
+      const { name, description, address, isDefault } = body;
 
       // If setting as default, unset other defaults for this organization
       if (isDefault && !existingLocation.isDefault) {
@@ -95,19 +95,20 @@ export async function PATCH(
           where: {
             organizationId: context.organizationId,
             isDefault: true,
-            id: { not: id }
+            id: { not: id },
           },
           data: {
-            isDefault: false
-          }
-        })
+            isDefault: false,
+          },
+        });
       }
 
-      const updateData: any = {}
-      if (name !== undefined) updateData.name = name
-      if (description !== undefined) updateData.description = description || null
-      if (address !== undefined) updateData.address = address || null
-      if (isDefault !== undefined) updateData.isDefault = isDefault
+      const updateData: any = {};
+      if (name !== undefined) updateData.name = name;
+      if (description !== undefined)
+        updateData.description = description || null;
+      if (address !== undefined) updateData.address = address || null;
+      if (isDefault !== undefined) updateData.isDefault = isDefault;
 
       const updatedLocation = await prisma.location.update({
         where: { id },
@@ -115,36 +116,36 @@ export async function PATCH(
         include: {
           seatLayouts: {
             where: {
-              isActive: true
+              isActive: true,
             },
             include: {
               seats: {
                 where: {
-                  isActive: true
-                }
-              }
-            }
-          }
-        }
-      })
+                  isActive: true,
+                },
+              },
+            },
+          },
+        },
+      });
 
       // Update organization's default location if needed
       if (isDefault) {
         await prisma.organization.update({
           where: { id: context.organizationId },
-          data: { defaultLocationId: updatedLocation.id }
-        })
+          data: { defaultLocationId: updatedLocation.id },
+        });
       }
 
-      return NextResponse.json(updatedLocation)
+      return NextResponse.json(updatedLocation);
     } catch (error) {
-      console.error('Error updating location:', error)
+      console.error("Error updating location:", error);
       return NextResponse.json(
-        { error: 'Internal server error' },
+        { error: "Internal server error" },
         { status: 500 }
-      )
+      );
     }
-  })
+  });
 }
 
 // DELETE /api/locations/[id] - Delete a location
@@ -155,70 +156,67 @@ export async function DELETE(
   return withOrganizationContext(request, async (req, context) => {
     try {
       // Check permissions
-      if (context.user.role !== 'ADMIN' && context.user.role !== 'TENANT_ADMIN') {
+      if (
+        context.user.role !== "ADMIN" &&
+        context.user.role !== "TENANT_ADMIN"
+      ) {
         return NextResponse.json(
-          { error: 'Forbidden: Only admins can delete locations' },
+          { error: "Forbidden: Only admins can delete locations" },
           { status: 403 }
-        )
+        );
       }
 
-      const { id } = await params
+      const { id } = await params;
 
       // Verify location belongs to organization
       const location = await prisma.location.findFirst({
         where: {
           id,
-          organizationId: context.organizationId
+          organizationId: context.organizationId,
         },
         include: {
           _count: {
             select: {
-              sessions: true
-            }
-          }
-        }
-      })
+              sessions: true,
+            },
+          },
+        },
+      });
 
       if (!location) {
         return NextResponse.json(
-          { error: 'Location not found' },
+          { error: "Location not found" },
           { status: 404 }
-        )
+        );
       }
 
       // Check if location has active sessions
       if (location._count.sessions > 0) {
         return NextResponse.json(
-          { error: 'Cannot delete location with active sessions' },
+          { error: "Cannot delete location with active sessions" },
           { status: 400 }
-        )
+        );
       }
 
       // If this was the default location, clear it from organization
       if (location.isDefault) {
         await prisma.organization.update({
           where: { id: context.organizationId },
-          data: { defaultLocationId: null }
-        })
+          data: { defaultLocationId: null },
+        });
       }
 
       await prisma.location.delete({
-        where: { id }
-      })
+        where: { id },
+      });
 
-      return NextResponse.json({ message: 'Location deleted successfully' })
+      return NextResponse.json({ message: "Location deleted successfully" });
     } catch (error) {
-      console.error('Error deleting location:', error)
+      console.error("Error deleting location:", error);
       return NextResponse.json(
-        { error: 'Internal server error' },
+        { error: "Internal server error" },
         { status: 500 }
-      )
+      );
     }
-  })
+  });
 }
-
-
-
-
-
-

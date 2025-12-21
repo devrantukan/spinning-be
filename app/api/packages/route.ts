@@ -162,4 +162,3 @@ export async function POST(request: NextRequest) {
     { requireAuth: true } // POST requires authentication
   );
 }
-
