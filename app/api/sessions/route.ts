@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
         const endDate = searchParams.get("endDate");
         const classId = searchParams.get("classId");
         const status = searchParams.get("status");
+        const timeFilter = searchParams.get("timeFilter"); // 'all', 'am', or 'pm'
 
         const where: any = {
           organizationId: context.organizationId,
@@ -31,6 +32,14 @@ export async function GET(request: NextRequest) {
 
         if (status) {
           where.status = status;
+        }
+
+        // Filter by AM/PM using the indexed amPm field
+        if (timeFilter && timeFilter !== "all") {
+          const upperTimeFilter = timeFilter.toUpperCase();
+          if (upperTimeFilter === "AM" || upperTimeFilter === "PM") {
+            where.amPm = upperTimeFilter;
+          }
         }
 
         const sessions = await prisma.session.findMany({
@@ -92,18 +101,36 @@ export async function POST(request: NextRequest) {
       }
 
       const body = await req.json();
-      const {
-        classId,
-        instructorId,
-        locationId,
-        startTime,
-        endTime,
-        maxCapacity,
-      } = body;
+      const { classId, instructorId, locationId, startTime, endTime } = body;
 
-      if (!classId || !startTime || !endTime) {
+      if (!classId || !startTime || !endTime || !instructorId) {
         return NextResponse.json(
-          { error: "Missing required fields: classId, startTime, endTime" },
+          {
+            error:
+              "Missing required fields: classId, startTime, endTime, instructorId",
+          },
+          { status: 400 }
+        );
+      }
+
+      // Validate that startTime is not in the past
+      const startDateTime = new Date(startTime);
+      const now = new Date();
+      if (startDateTime < now) {
+        return NextResponse.json(
+          {
+            error:
+              "Cannot create sessions in the past. Please select a future date.",
+          },
+          { status: 400 }
+        );
+      }
+
+      // Validate that endTime is after startTime
+      const endDateTime = new Date(endTime);
+      if (endDateTime <= startDateTime) {
+        return NextResponse.json(
+          { error: "End time must be after start time." },
           { status: 400 }
         );
       }
@@ -123,15 +150,78 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Verify instructor belongs to organization
+      const instructorExists = await prisma.instructor.findFirst({
+        where: {
+          id: instructorId,
+          organizationId: context.organizationId,
+        },
+      });
+
+      if (!instructorExists) {
+        return NextResponse.json(
+          { error: "Instructor not found or does not belong to organization" },
+          { status: 404 }
+        );
+      }
+
+      // Calculate maxCapacity from location's active seat layout
+      let calculatedMaxCapacity = 0; // Will be set from seat layout
+      if (locationId) {
+        const activeSeatLayout = await prisma.seatLayout.findFirst({
+          where: {
+            locationId: locationId,
+            isActive: true,
+          },
+          include: {
+            seats: {
+              where: {
+                isActive: true,
+              },
+            },
+          },
+        });
+
+        if (activeSeatLayout) {
+          // Count only active seats
+          calculatedMaxCapacity = activeSeatLayout.seats.length;
+        } else {
+          return NextResponse.json(
+            {
+              error:
+                "Selected location does not have an active seat layout. Please activate a seat layout for this location first.",
+            },
+            { status: 400 }
+          );
+        }
+      } else {
+        return NextResponse.json(
+          {
+            error:
+              "Location is required to create a session (needed for seat layout capacity)",
+          },
+          { status: 400 }
+        );
+      }
+
+      // Calculate duration and AM/PM (using already validated dates)
+      const durationMinutes = Math.round(
+        (endDateTime.getTime() - startDateTime.getTime()) / (1000 * 60)
+      );
+      const startHour = startDateTime.getHours();
+      const amPm = startHour < 12 ? "AM" : "PM";
+
       const session = await prisma.session.create({
         data: {
           classId,
           organizationId: context.organizationId,
-          instructorId: instructorId || null,
+          instructorId,
           locationId: locationId || null,
-          startTime: new Date(startTime),
-          endTime: new Date(endTime),
-          maxCapacity: maxCapacity || classExists.maxCapacity,
+          startTime: startDateTime,
+          endTime: endDateTime,
+          duration: durationMinutes,
+          amPm: amPm,
+          maxCapacity: calculatedMaxCapacity,
           currentBookings: 0,
           status: "SCHEDULED",
         },
@@ -153,10 +243,16 @@ export async function POST(request: NextRequest) {
       });
 
       return NextResponse.json(session, { status: 201 });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating session:", error);
+      const errorMessage = error?.message || "Internal server error";
+      const errorDetails = error?.meta || error?.code || "";
+      console.error("Error details:", { errorMessage, errorDetails, error });
       return NextResponse.json(
-        { error: "Internal server error" },
+        {
+          error: errorMessage,
+          details: errorDetails ? String(errorDetails) : undefined,
+        },
         { status: 500 }
       );
     }

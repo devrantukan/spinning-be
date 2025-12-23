@@ -14,7 +14,8 @@
     "make-admin": "node scripts/make-admin.js",
     "make-tenant-admin": "npx tsx scripts/make-tenant-admin.ts",
     "assign-user-to-org": "npx tsx scripts/assign-user-to-org.ts",
-    "seed:packages": "npx tsx scripts/seed-packages.ts"
+    "seed:packages": "npx tsx scripts/seed-packages.ts",
+    "seed:classes": "npx tsx scripts/seed-classes.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.19.1",
