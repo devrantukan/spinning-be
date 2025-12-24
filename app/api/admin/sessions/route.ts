@@ -56,8 +56,7 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             name: true,
-            description: true,
-            duration: true
+            description: true
           }
         },
         instructor: {
