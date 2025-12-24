@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
           seat: {
             select: {
               id: true,
-              name: true,
+              seatNumber: true,
               row: true,
               column: true,
             },
