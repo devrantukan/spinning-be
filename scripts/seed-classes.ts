@@ -133,6 +133,32 @@ const classesData: ClassData[] = [
     musicGenre: "Afro, Hip-Hop, Rap Turkish & International Remixes",
     musicGenreTr: "Afro, Hip&Hop, Rap Türkçe & Yabancı Remixler",
   },
+  {
+    name: "After party Flow",
+    nameTr: "Gecenin akışına Pedalla",
+    description: "Ride With Samos View - After party flow",
+    descriptionTr: "Samos Manzarasına Pedalla - Gecenin akışına pedalla",
+    musicGenre: "Latin House, Reggaeton, Afro Remixes",
+    musicGenreTr: "Latin House, Reggaeton, Afro Remixes",
+  },
+
+  // PAZAR - "Tembellik Yok Gel ve Pedalla / It's Sunday Get Up and Ride"
+  {
+    name: "SunDay FunDay",
+    nameTr: "Pazar Tadında",
+    description: "It's Sunday Get Up and Ride - Sunday fun day",
+    descriptionTr: "Tembellik Yok Gel ve Pedalla - Pazar tadında",
+    musicGenre: "80's 90's, 2000's Pop Turkish & International Remixes",
+    musicGenreTr: "80'ler 90'lar, 2000'ler Pop Türkçe & Yabancı Remixler",
+  },
+  {
+    name: "Ride In To Week",
+    nameTr: "Yeni Haftaya Enerjiyle",
+    description: "It's Sunday Get Up and Ride - Ride into the week",
+    descriptionTr: "Tembellik Yok Gel ve Pedalla - Yeni haftaya enerjiyle",
+    musicGenre: "Melodic House, Progressive House, Turkish Pop Remixes",
+    musicGenreTr: "Melodic House, Progressive House, Turkish Pop Remixes",
+  },
 ];
 
 async function main() {

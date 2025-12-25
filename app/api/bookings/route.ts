@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
   return withOrganizationContext(request, async (req, context) => {
     try {
       const body = await req.json();
-      const { sessionId } = body;
+      const { sessionId, seatId, seats, paymentType, memberId: bodyMemberId } = body;
 
       if (!sessionId) {
         return NextResponse.json(
@@ -103,21 +103,40 @@ export async function POST(request: NextRequest) {
       }
 
       // Get or create member for the user
-      let member = await prisma.member.findFirst({
-        where: {
-          userId: context.user.id,
-          organizationId: context.organizationId,
-        },
-      });
-
-      if (!member) {
-        member = await prisma.member.create({
-          data: {
-            userId: context.user.id,
+      // Use memberId from body if provided (for admin bookings), otherwise use context user
+      let member;
+      if (bodyMemberId && context.user.role !== "MEMBER") {
+        // Admin/Tenant Admin can book for other members
+        member = await prisma.member.findFirst({
+          where: {
+            id: bodyMemberId,
             organizationId: context.organizationId,
-            status: "ACTIVE",
           },
         });
+        if (!member) {
+          return NextResponse.json(
+            { error: "Member not found" },
+            { status: 404 }
+          );
+        }
+      } else {
+        // Regular member booking
+        member = await prisma.member.findFirst({
+          where: {
+            userId: context.user.id,
+            organizationId: context.organizationId,
+          },
+        });
+
+        if (!member) {
+          member = await prisma.member.create({
+            data: {
+              userId: context.user.id,
+              organizationId: context.organizationId,
+              status: "ACTIVE",
+            },
+          });
+        }
       }
 
       // Verify session exists and belongs to organization
@@ -140,7 +159,47 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Session is full" }, { status: 400 });
       }
 
-      // Check if already booked
+      // Determine the seat ID to use (prefer seatId, then first from seats array)
+      const finalSeatId = seatId || (Array.isArray(seats) && seats.length > 0 ? seats[0] : null);
+
+      // If a seat is specified, verify it exists and check availability
+      let seat = null;
+      let creditCost = 1; // Default credit cost
+      if (finalSeatId) {
+        seat = await prisma.seat.findUnique({
+          where: { id: finalSeatId },
+        });
+
+        if (!seat) {
+          return NextResponse.json(
+            { error: "Seat not found" },
+            { status: 404 }
+          );
+        }
+
+        // Check if seat is already taken by another member for this session
+        const seatBooking = await prisma.booking.findFirst({
+          where: {
+            sessionId,
+            seatId: finalSeatId,
+            status: {
+              not: "CANCELLED",
+            },
+          },
+        });
+
+        if (seatBooking && seatBooking.memberId !== member.id) {
+          return NextResponse.json(
+            { error: "This seat is already taken" },
+            { status: 400 }
+          );
+        }
+
+        // Get credit cost from seat
+        creditCost = seat.creditCost || 1;
+      }
+
+      // Check if member already has a booking for this session
       const existingBooking = await prisma.booking.findUnique({
         where: {
           sessionId_memberId: {
@@ -150,33 +209,137 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      if (existingBooking && existingBooking.status !== "CANCELLED") {
-        return NextResponse.json(
-          { error: "Already booked for this session" },
-          { status: 400 }
-        );
-      }
+      let booking;
+      let isNewBooking = false;
 
-      // Create booking
-      const booking = await prisma.booking.create({
-        data: {
+      if (existingBooking) {
+        if (existingBooking.status === "CANCELLED") {
+          // If booking was cancelled, reactivate it with new seat/payment info
+          isNewBooking = true; // Count as new for session booking increment
+          
+          // Check if the new seat is available (if seat is specified)
+          if (finalSeatId && seat) {
+            const newSeatBooking = await prisma.booking.findFirst({
+              where: {
+                sessionId,
+                seatId: finalSeatId,
+                status: {
+                  not: "CANCELLED",
+                },
+                id: {
+                  not: existingBooking.id, // Exclude current cancelled booking
+                },
+              },
+            });
+
+            if (newSeatBooking) {
+              return NextResponse.json(
+                { error: "This seat is already taken" },
+                { status: 400 }
+              );
+            }
+          }
+
+          // Reactivate cancelled booking
+          booking = await prisma.booking.update({
+            where: { id: existingBooking.id },
+            data: {
+              seatId: finalSeatId || existingBooking.seatId,
+              creditCost,
+              paymentType: paymentType || existingBooking.paymentType || "CREDITS",
+              status: "CONFIRMED",
+            },
+          });
+
+          // Increment session booking count (was decremented when cancelled)
+          await prisma.session.update({
+            where: { id: sessionId },
+            data: {
+              currentBookings: {
+                increment: 1,
+              },
+            },
+          });
+        } else {
+          // Member already has an active booking - update the seat if different
+          if (finalSeatId && existingBooking.seatId !== finalSeatId) {
+            // Check if the new seat is available
+            if (seat) {
+              const newSeatBooking = await prisma.booking.findFirst({
+                where: {
+                  sessionId,
+                  seatId: finalSeatId,
+                  status: {
+                    not: "CANCELLED",
+                  },
+                  id: {
+                    not: existingBooking.id, // Exclude current booking
+                  },
+                },
+              });
+
+              if (newSeatBooking) {
+                return NextResponse.json(
+                  { error: "This seat is already taken" },
+                  { status: 400 }
+                );
+              }
+            }
+
+            // Update existing booking with new seat
+            booking = await prisma.booking.update({
+              where: { id: existingBooking.id },
+              data: {
+                seatId: finalSeatId,
+                creditCost,
+                paymentType: paymentType || existingBooking.paymentType,
+              },
+            });
+          } else {
+            // Same seat or no seat change - return existing booking
+            booking = existingBooking;
+          }
+        }
+      } else {
+        // Create new booking
+        isNewBooking = true;
+        console.log("Creating new booking:", {
           sessionId,
           memberId: member.id,
           userId: context.user.id,
           organizationId: context.organizationId,
-          status: "CONFIRMED",
-        },
-      });
-
-      // Update session booking count
-      await prisma.session.update({
-        where: { id: sessionId },
-        data: {
-          currentBookings: {
-            increment: 1,
+          seatId: finalSeatId || null,
+          creditCost,
+          paymentType: paymentType || "CREDITS",
+        });
+        
+        booking = await prisma.booking.create({
+          data: {
+            sessionId,
+            memberId: member.id,
+            userId: context.user.id,
+            organizationId: context.organizationId,
+            seatId: finalSeatId || null,
+            creditCost,
+            paymentType: paymentType || "CREDITS",
+            status: "CONFIRMED",
           },
-        },
-      });
+        });
+
+        console.log("Booking created successfully with ID:", booking.id);
+
+        // Update session booking count only for new bookings
+        await prisma.session.update({
+          where: { id: sessionId },
+          data: {
+            currentBookings: {
+              increment: 1,
+            },
+          },
+        });
+        
+        console.log("Session booking count incremented");
+      }
 
       const bookingWithDetails = await prisma.booking.findUnique({
         where: { id: booking.id },
@@ -184,6 +347,18 @@ export async function POST(request: NextRequest) {
           session: {
             include: {
               class: true,
+              location: true,
+              instructor: {
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      name: true,
+                      email: true,
+                    },
+                  },
+                },
+              },
             },
           },
           member: {
@@ -197,20 +372,50 @@ export async function POST(request: NextRequest) {
               },
             },
           },
+          seat: {
+            select: {
+              id: true,
+              seatNumber: true,
+              row: true,
+              column: true,
+              type: true,
+            },
+          },
         },
       });
 
-      return NextResponse.json(bookingWithDetails, { status: 201 });
+      console.log("Returning booking response:", {
+        bookingId: bookingWithDetails?.id,
+        isNewBooking,
+        status: isNewBooking ? 201 : 200,
+      });
+      
+      return NextResponse.json(bookingWithDetails, { status: isNewBooking ? 201 : 200 });
     } catch (error: any) {
+      console.error("Error creating booking:", {
+        error: error.message,
+        code: error.code,
+        meta: error.meta,
+        stack: error.stack?.substring(0, 500),
+      });
+      
       if (error.code === "P2002") {
+        // Unique constraint violation
+        const target = error.meta?.target || [];
+        if (target.includes("sessionId") && target.includes("memberId")) {
+          return NextResponse.json(
+            { error: "Already booked for this session" },
+            { status: 400 }
+          );
+        }
         return NextResponse.json(
-          { error: "Already booked for this session" },
+          { error: "Booking conflict. Please try again." },
           { status: 400 }
         );
       }
-      console.error("Error creating booking:", error);
+      
       return NextResponse.json(
-        { error: "Internal server error" },
+        { error: error.message || "Internal server error" },
         { status: 500 }
       );
     }
