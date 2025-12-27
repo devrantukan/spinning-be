@@ -2,13 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withOrganizationContext } from "@/lib/middleware";
 
-// GET /api/sessions/[id] - Get a specific session
+// GET /api/sessions/[id] - Get a specific session (public access)
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  return withOrganizationContext(request, async (req, context) => {
+  return withOrganizationContext(
+    request,
+    async (req, context) => {
     try {
       const session = await prisma.session.findFirst({
         where: {
@@ -62,7 +64,9 @@ export async function GET(
         { status: 500 }
       );
     }
-  });
+    },
+    { requireAuth: false } // Make GET endpoint public
+  );
 }
 
 // PATCH /api/sessions/[id] - Update a session

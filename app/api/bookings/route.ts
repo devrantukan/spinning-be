@@ -400,7 +400,13 @@ export async function POST(request: NextRequest) {
       });
       
       if (error.code === "P2002") {
-        // Unique constraint violation
+        // Unique constraint violation - this means the unique constraint on sessionId_memberId needs to be removed
+        // to allow multiple bookings per member per session
+        console.error("Unique constraint violation - schema needs to be updated to allow multiple bookings");
+        return NextResponse.json(
+          { error: "Booking constraint violation. Please contact support." },
+          { status: 400 }
+        );
         const target = error.meta?.target || [];
         if (target.includes("sessionId") && target.includes("memberId")) {
           return NextResponse.json(
