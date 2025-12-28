@@ -72,6 +72,15 @@ const emailTranslations: Record<string, Record<string, string>> = {
     adminBookingCancellationMessage: "A booking has been cancelled.",
     member: "Member",
     memberEmail: "Member Email",
+    bookingConfirmationSubject: "Booking Confirmation - {orgName}",
+    bookingConfirmationTitle: "Booking Confirmed",
+    bookingConfirmationGreeting: "Hello",
+    bookingConfirmationMessage: "Your booking has been confirmed successfully!",
+    bookingConfirmationDetails: "Booking Details",
+    seatNumber: "Bicycle",
+    adminBookingConfirmationSubject: "New Booking Notification",
+    adminBookingConfirmationTitle: "New Booking",
+    adminBookingConfirmationMessage: "A new booking has been created.",
   },
   tr: {
     passwordResetSubject: "Şifre Sıfırlama - {orgName}",
@@ -118,6 +127,15 @@ const emailTranslations: Record<string, Record<string, string>> = {
     adminBookingCancellationSubject: "Rezervasyon İptali Bildirimi",
     adminBookingCancellationTitle: "Rezervasyon İptal Edildi",
     adminBookingCancellationMessage: "Bir rezervasyon iptal edilmiştir.",
+    bookingConfirmationSubject: "Rezervasyon Onayı - {orgName}",
+    bookingConfirmationTitle: "Rezervasyon Onaylandı",
+    bookingConfirmationGreeting: "Merhaba",
+    bookingConfirmationMessage: "Rezervasyonunuz başarıyla onaylandı!",
+    bookingConfirmationDetails: "Rezervasyon Detayları",
+    seatNumber: "Bisiklet",
+    adminBookingConfirmationSubject: "Yeni Rezervasyon Bildirimi",
+    adminBookingConfirmationTitle: "Yeni Rezervasyon",
+    adminBookingConfirmationMessage: "Yeni bir rezervasyon oluşturuldu.",
     member: "Üye",
     memberEmail: "Üye E-postası",
   },
@@ -905,6 +923,388 @@ export async function sendBookingCancellationEmails(
     return { success: true };
   } catch (error: any) {
     console.error("[EMAIL] Failed to send booking cancellation emails:", error);
+    return {
+      success: false,
+      error: error.message || "Failed to send email",
+    };
+  }
+}
+
+// Send booking confirmation emails (to member and admin)
+export async function sendBookingConfirmationEmails(
+  memberEmail: string,
+  adminEmail: string,
+  bookingDetails: {
+    bookingId: string;
+    className?: string;
+    classNameTr?: string;
+    sessionDate: string;
+    sessionTime: string;
+    location?: string;
+    instructor?: string;
+    paymentType?: string;
+    creditsUsed?: number;
+    seatNumber?: string;
+  },
+  memberName?: string,
+  orgSMTP?: OrganizationSMTPConfig | null
+): Promise<{ success: boolean; error?: string }> {
+  const transporter = createEmailTransporter(orgSMTP);
+  const config = getSMTPConfig(orgSMTP);
+
+  if (!transporter || !config) {
+    return {
+      success: false,
+      error:
+        "SMTP not configured. Please configure SMTP in organization settings or set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD in environment variables.",
+    };
+  }
+
+  // Get organization language (default to 'en')
+  const orgLanguage = orgSMTP?.language || "en";
+  const t = (key: string) => getEmailText(orgLanguage, key, config.senderName);
+
+  const greetingText = t("bookingConfirmationGreeting");
+  const greeting = memberName
+    ? `${greetingText} ${memberName},`
+    : `${greetingText},`;
+
+  // Format payment type
+  const formatPaymentType = (type?: string): string => {
+    if (!type) return "-";
+    if (orgLanguage === "tr") {
+      switch (type) {
+        case "CREDITS":
+          return "Kredi";
+        case "ALL_ACCESS":
+          return "All Access";
+        case "FRIEND_PASS":
+          return "Arkadaş Pası";
+        default:
+          return type;
+      }
+    } else {
+      switch (type) {
+        case "CREDITS":
+          return "Credits";
+        case "ALL_ACCESS":
+          return "All Access";
+        case "FRIEND_PASS":
+          return "Friend Pass";
+        default:
+          return type;
+      }
+    }
+  };
+
+  const className =
+    orgLanguage === "tr" && bookingDetails.classNameTr
+      ? bookingDetails.classNameTr
+      : bookingDetails.className || "-";
+
+  // Member email HTML
+  const memberEmailHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${t("bookingConfirmationTitle")}</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background-color: #f8f9fa; padding: 30px; border-radius: 8px;">
+    <h1 style="color: #388e3c; margin-top: 0;">${t(
+      "bookingConfirmationTitle"
+    )}</h1>
+    
+    <p>${greeting}</p>
+    
+    <p>${t("bookingConfirmationMessage")}</p>
+    
+    <div style="background-color: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #388e3c;">
+      <h2 style="margin-top: 0; color: #333;">${t(
+        "bookingConfirmationDetails"
+      )}</h2>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold; color: #666; width: 40%;">${t(
+            "bookingId"
+          )}:</td>
+          <td style="padding: 8px 0; color: #333;">${
+            bookingDetails.bookingId
+          }</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold; color: #666;">${t(
+            "className"
+          )}:</td>
+          <td style="padding: 8px 0; color: #333;">${className}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold; color: #666;">${t(
+            "sessionDate"
+          )}:</td>
+          <td style="padding: 8px 0; color: #333;">${
+            bookingDetails.sessionDate
+          }</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold; color: #666;">${t(
+            "sessionTime"
+          )}:</td>
+          <td style="padding: 8px 0; color: #333;">${
+            bookingDetails.sessionTime
+          }</td>
+        </tr>
+        ${
+          bookingDetails.location
+            ? `
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold; color: #666;">${t(
+            "location"
+          )}:</td>
+          <td style="padding: 8px 0; color: #333;">${
+            bookingDetails.location
+          }</td>
+        </tr>
+        `
+            : ""
+        }
+        ${
+          bookingDetails.instructor
+            ? `
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold; color: #666;">${t(
+            "instructor"
+          )}:</td>
+          <td style="padding: 8px 0; color: #333;">${
+            bookingDetails.instructor
+          }</td>
+        </tr>
+        `
+            : ""
+        }
+        ${
+          bookingDetails.seatNumber
+            ? `
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold; color: #666;">${t(
+            "seatNumber"
+          )}:</td>
+          <td style="padding: 8px 0; color: #333;">${
+            bookingDetails.seatNumber
+          }</td>
+        </tr>
+        `
+            : ""
+        }
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold; color: #666;">${t(
+            "paymentType"
+          )}:</td>
+          <td style="padding: 8px 0; color: #333;">${formatPaymentType(
+            bookingDetails.paymentType
+          )}</td>
+        </tr>
+        ${
+          bookingDetails.paymentType === "CREDITS" && bookingDetails.creditsUsed
+            ? `
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold; color: #666;">${t(
+            "credits"
+          )}:</td>
+          <td style="padding: 8px 0; color: #333;">${
+            bookingDetails.creditsUsed
+          }</td>
+        </tr>
+        `
+            : ""
+        }
+      </table>
+    </div>
+    
+    <p style="color: #666; font-size: 12px; margin-top: 20px;">
+      ${t("bookingCancellationBestRegards")},<br>
+      ${config.senderName}
+    </p>
+  </div>
+</body>
+</html>
+  `;
+
+  // Admin email HTML
+  const adminEmailHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${t("adminBookingConfirmationTitle")}</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background-color: #f8f9fa; padding: 30px; border-radius: 8px;">
+    <h1 style="color: #1976d2; margin-top: 0;">${t(
+      "adminBookingConfirmationTitle"
+    )}</h1>
+    
+    <p>${t("adminBookingConfirmationMessage")}</p>
+    
+    <div style="background-color: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #1976d2;">
+      <h2 style="margin-top: 0; color: #333;">${t(
+        "bookingConfirmationDetails"
+      )}</h2>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold; color: #666; width: 40%;">${t(
+            "bookingId"
+          )}:</td>
+          <td style="padding: 8px 0; color: #333;">${
+            bookingDetails.bookingId
+          }</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold; color: #666;">${t(
+            "member"
+          )}:</td>
+          <td style="padding: 8px 0; color: #333;">${memberName || "-"}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold; color: #666;">${t(
+            "memberEmail"
+          )}:</td>
+          <td style="padding: 8px 0; color: #333;">${memberEmail}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold; color: #666;">${t(
+            "className"
+          )}:</td>
+          <td style="padding: 8px 0; color: #333;">${className}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold; color: #666;">${t(
+            "sessionDate"
+          )}:</td>
+          <td style="padding: 8px 0; color: #333;">${
+            bookingDetails.sessionDate
+          }</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold; color: #666;">${t(
+            "sessionTime"
+          )}:</td>
+          <td style="padding: 8px 0; color: #333;">${
+            bookingDetails.sessionTime
+          }</td>
+        </tr>
+        ${
+          bookingDetails.location
+            ? `
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold; color: #666;">${t(
+            "location"
+          )}:</td>
+          <td style="padding: 8px 0; color: #333;">${
+            bookingDetails.location
+          }</td>
+        </tr>
+        `
+            : ""
+        }
+        ${
+          bookingDetails.instructor
+            ? `
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold; color: #666;">${t(
+            "instructor"
+          )}:</td>
+          <td style="padding: 8px 0; color: #333;">${
+            bookingDetails.instructor
+          }</td>
+        </tr>
+        `
+            : ""
+        }
+        ${
+          bookingDetails.seatNumber
+            ? `
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold; color: #666;">${t(
+            "seatNumber"
+          )}:</td>
+          <td style="padding: 8px 0; color: #333;">${
+            bookingDetails.seatNumber
+          }</td>
+        </tr>
+        `
+            : ""
+        }
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold; color: #666;">${t(
+            "paymentType"
+          )}:</td>
+          <td style="padding: 8px 0; color: #333;">${formatPaymentType(
+            bookingDetails.paymentType
+          )}</td>
+        </tr>
+        ${
+          bookingDetails.paymentType === "CREDITS" && bookingDetails.creditsUsed
+            ? `
+        <tr>
+          <td style="padding: 8px 0; font-weight: bold; color: #666;">${t(
+            "credits"
+          )}:</td>
+          <td style="padding: 8px 0; color: #333;">${
+            bookingDetails.creditsUsed
+          }</td>
+        </tr>
+        `
+            : ""
+        }
+      </table>
+    </div>
+    
+    <p style="color: #666; font-size: 12px; margin-top: 20px;">
+      ${t("bookingCancellationBestRegards")},<br>
+      ${config.senderName}
+    </p>
+  </div>
+</body>
+</html>
+  `;
+
+  try {
+    // Send emails in parallel
+    const emailPromises = [
+      transporter.sendMail({
+        from: `"${config.senderName}" <${config.senderEmail}>`,
+        to: memberEmail,
+        subject: t("bookingConfirmationSubject").replace(
+          "{orgName}",
+          config.senderName
+        ),
+        html: memberEmailHtml,
+        text: memberEmailHtml.replace(/<[^>]*>/g, ""),
+      }),
+      transporter.sendMail({
+        from: `"${config.senderName}" <${config.senderEmail}>`,
+        to: adminEmail,
+        subject: t("adminBookingConfirmationSubject"),
+        html: adminEmailHtml,
+        text: adminEmailHtml.replace(/<[^>]*>/g, ""),
+      }),
+    ];
+
+    await Promise.all(emailPromises);
+
+    console.log("[EMAIL] Booking confirmation emails sent successfully:", {
+      memberEmail,
+      adminEmail,
+      bookingId: bookingDetails.bookingId,
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("[EMAIL] Failed to send booking confirmation emails:", error);
     return {
       success: false,
       error: error.message || "Failed to send email",

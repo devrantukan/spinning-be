@@ -39,6 +39,17 @@ export async function GET(request: NextRequest) {
             slug: true
           }
         },
+        instructor: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          }
+        },
         _count: {
           select: {
             sessions: true

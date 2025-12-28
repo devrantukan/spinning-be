@@ -1,50 +1,52 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { withOrganizationContext } from '@/lib/middleware'
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { withOrganizationContext } from "@/lib/middleware";
 
 // GET /api/seat-layouts/[id] - Get a specific seat layout
+// Public endpoint - no authentication required for viewing seat layouts
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  return withOrganizationContext(request, async (req, context) => {
-    try {
-      const { id } = await params
+  return withOrganizationContext(
+    request,
+    async (req, context) => {
+      try {
+        const { id } = await params;
 
-      const seatLayout = await prisma.seatLayout.findFirst({
-        where: {
-          id,
-          location: {
-            organizationId: context.organizationId
-          }
-        },
-        include: {
-          location: true,
-          seats: {
-            orderBy: [
-              { row: 'asc' },
-              { column: 'asc' }
-            ]
-          }
+        const seatLayout = await prisma.seatLayout.findFirst({
+          where: {
+            id,
+            location: {
+              organizationId: context.organizationId,
+            },
+          },
+          include: {
+            location: true,
+            seats: {
+              orderBy: [{ row: "asc" }, { column: "asc" }],
+            },
+          },
+        });
+
+        if (!seatLayout) {
+          return NextResponse.json(
+            { error: "Seat layout not found" },
+            { status: 404 }
+          );
         }
-      })
 
-      if (!seatLayout) {
+        return NextResponse.json(seatLayout);
+      } catch (error) {
+        console.error("Error fetching seat layout:", error);
         return NextResponse.json(
-          { error: 'Seat layout not found' },
-          { status: 404 }
-        )
+          { error: "Internal server error" },
+          { status: 500 }
+        );
       }
-
-      return NextResponse.json(seatLayout)
-    } catch (error) {
-      console.error('Error fetching seat layout:', error)
-      return NextResponse.json(
-        { error: 'Internal server error' },
-        { status: 500 }
-      )
-    }
-  })
+    },
+    { requireAuth: false } // Make authentication optional for public access
+  );
 }
 
 // PATCH /api/seat-layouts/[id] - Update a seat layout
@@ -55,34 +57,37 @@ export async function PATCH(
   return withOrganizationContext(request, async (req, context) => {
     try {
       // Check permissions
-      if (context.user.role !== 'ADMIN' && context.user.role !== 'TENANT_ADMIN') {
+      if (
+        context.user.role !== "ADMIN" &&
+        context.user.role !== "TENANT_ADMIN"
+      ) {
         return NextResponse.json(
-          { error: 'Forbidden: Only admins can update seat layouts' },
+          { error: "Forbidden: Only admins can update seat layouts" },
           { status: 403 }
-        )
+        );
       }
 
-      const { id } = await params
-      const body = await req.json()
+      const { id } = await params;
+      const body = await req.json();
 
       // Verify seat layout belongs to organization
       const existingLayout = await prisma.seatLayout.findFirst({
         where: {
           id,
           location: {
-            organizationId: context.organizationId
-          }
-        }
-      })
+            organizationId: context.organizationId,
+          },
+        },
+      });
 
       if (!existingLayout) {
         return NextResponse.json(
-          { error: 'Seat layout not found' },
+          { error: "Seat layout not found" },
           { status: 404 }
-        )
+        );
       }
 
-      const { name, description, isActive, gridRows, gridColumns } = body
+      const { name, description, isActive, gridRows, gridColumns } = body;
 
       // If setting as active, deactivate other layouts for this location
       if (isActive && !existingLayout.isActive) {
@@ -90,20 +95,22 @@ export async function PATCH(
           where: {
             locationId: existingLayout.locationId,
             isActive: true,
-            id: { not: id }
+            id: { not: id },
           },
           data: {
-            isActive: false
-          }
-        })
+            isActive: false,
+          },
+        });
       }
 
-      const updateData: any = {}
-      if (name !== undefined) updateData.name = name
-      if (description !== undefined) updateData.description = description || null
-      if (isActive !== undefined) updateData.isActive = isActive
-      if (gridRows !== undefined) updateData.gridRows = gridRows || null
-      if (gridColumns !== undefined) updateData.gridColumns = gridColumns || null
+      const updateData: any = {};
+      if (name !== undefined) updateData.name = name;
+      if (description !== undefined)
+        updateData.description = description || null;
+      if (isActive !== undefined) updateData.isActive = isActive;
+      if (gridRows !== undefined) updateData.gridRows = gridRows || null;
+      if (gridColumns !== undefined)
+        updateData.gridColumns = gridColumns || null;
 
       const updatedLayout = await prisma.seatLayout.update({
         where: { id },
@@ -111,23 +118,20 @@ export async function PATCH(
         include: {
           location: true,
           seats: {
-            orderBy: [
-              { row: 'asc' },
-              { column: 'asc' }
-            ]
-          }
-        }
-      })
+            orderBy: [{ row: "asc" }, { column: "asc" }],
+          },
+        },
+      });
 
-      return NextResponse.json(updatedLayout)
+      return NextResponse.json(updatedLayout);
     } catch (error) {
-      console.error('Error updating seat layout:', error)
+      console.error("Error updating seat layout:", error);
       return NextResponse.json(
-        { error: 'Internal server error' },
+        { error: "Internal server error" },
         { status: 500 }
-      )
+      );
     }
-  })
+  });
 }
 
 // DELETE /api/seat-layouts/[id] - Delete a seat layout
@@ -138,44 +142,46 @@ export async function DELETE(
   return withOrganizationContext(request, async (req, context) => {
     try {
       // Check permissions
-      if (context.user.role !== 'ADMIN' && context.user.role !== 'TENANT_ADMIN') {
+      if (
+        context.user.role !== "ADMIN" &&
+        context.user.role !== "TENANT_ADMIN"
+      ) {
         return NextResponse.json(
-          { error: 'Forbidden: Only admins can delete seat layouts' },
+          { error: "Forbidden: Only admins can delete seat layouts" },
           { status: 403 }
-        )
+        );
       }
 
-      const { id } = await params
+      const { id } = await params;
 
       // Verify seat layout belongs to organization
       const seatLayout = await prisma.seatLayout.findFirst({
         where: {
           id,
           location: {
-            organizationId: context.organizationId
-          }
-        }
-      })
+            organizationId: context.organizationId,
+          },
+        },
+      });
 
       if (!seatLayout) {
         return NextResponse.json(
-          { error: 'Seat layout not found' },
+          { error: "Seat layout not found" },
           { status: 404 }
-        )
+        );
       }
 
       await prisma.seatLayout.delete({
-        where: { id }
-      })
+        where: { id },
+      });
 
-      return NextResponse.json({ message: 'Seat layout deleted successfully' })
+      return NextResponse.json({ message: "Seat layout deleted successfully" });
     } catch (error) {
-      console.error('Error deleting seat layout:', error)
+      console.error("Error deleting seat layout:", error);
       return NextResponse.json(
-        { error: 'Internal server error' },
+        { error: "Internal server error" },
         { status: 500 }
-      )
+      );
     }
-  })
+  });
 }
-

@@ -3,47 +3,53 @@ import { prisma } from "@/lib/prisma";
 import { withOrganizationContext } from "@/lib/middleware";
 
 // GET /api/seat-layouts/[id]/seats - Get all seats for a seat layout
+// Public endpoint - no authentication required for viewing seats
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  return withOrganizationContext(request, async (req, context) => {
-    try {
-      const { id: seatLayoutId } = await params;
+  // Allow public access for GET requests (seats should be publicly viewable)
+  return withOrganizationContext(
+    request,
+    async (req, context) => {
+      try {
+        const { id: seatLayoutId } = await params;
 
-      // Verify seat layout belongs to organization
-      const seatLayout = await prisma.seatLayout.findFirst({
-        where: {
-          id: seatLayoutId,
-          location: {
-            organizationId: context.organizationId,
+        // Verify seat layout belongs to organization
+        const seatLayout = await prisma.seatLayout.findFirst({
+          where: {
+            id: seatLayoutId,
+            location: {
+              organizationId: context.organizationId,
+            },
           },
-        },
-      });
+        });
 
-      if (!seatLayout) {
+        if (!seatLayout) {
+          return NextResponse.json(
+            { error: "Seat layout not found" },
+            { status: 404 }
+          );
+        }
+
+        const seats = await prisma.seat.findMany({
+          where: {
+            seatLayoutId,
+          },
+          orderBy: [{ row: "asc" }, { column: "asc" }],
+        });
+
+        return NextResponse.json(seats);
+      } catch (error) {
+        console.error("Error fetching seats:", error);
         return NextResponse.json(
-          { error: "Seat layout not found" },
-          { status: 404 }
+          { error: "Internal server error" },
+          { status: 500 }
         );
       }
-
-      const seats = await prisma.seat.findMany({
-        where: {
-          seatLayoutId,
-        },
-        orderBy: [{ row: "asc" }, { column: "asc" }],
-      });
-
-      return NextResponse.json(seats);
-    } catch (error) {
-      console.error("Error fetching seats:", error);
-      return NextResponse.json(
-        { error: "Internal server error" },
-        { status: 500 }
-      );
-    }
-  });
+    },
+    { requireAuth: false } // Make authentication optional for public access
+  );
 }
 
 // POST /api/seat-layouts/[id]/seats - Create a new seat (or bulk create)
