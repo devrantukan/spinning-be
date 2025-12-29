@@ -32,17 +32,6 @@ export async function GET(
             address: true
           }
         },
-        instructor: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true
-              }
-            }
-          }
-        },
         sessions: {
           include: {
             instructor: {
