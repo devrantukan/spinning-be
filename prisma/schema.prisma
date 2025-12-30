@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,102 +7,87 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Multi-tenant root model
 model Organization {
-  id                String    @id @default(uuid())
-  name              String
-  slug              String    @unique
-  description       String?
-  contactUserId     String?
-  contactUser       User?     @relation("OrganizationContact", fields: [contactUserId], references: [id], onDelete: SetNull)
-  address           String?
-  phone             String?
-  website           String?
-  email             String?
-  // Social media links
-  facebook          String?
-  twitter           String?
-  instagram         String?
-  linkedin          String?
-  tiktok            String?
-  // Location coordinates
-  latitude          Float?
-  longitude         Float?
-  // SMTP Configuration (for sending emails)
-  smtpHost          String?
-  smtpPort          Int?
-  smtpUser          String?
-  smtpPassword      String? // Stored encrypted in production
-  smtpFromEmail     String?
-  smtpFromName      String?
-  // Language preference for emails and UI
-  language          String?   @default("en") // 'en' or 'tr'
-  // Pricing
-  creditPrice       Float? // Price per credit (used to determine revenue from credits)
-  currency          String?   @default("USD") // Currency code (USD, EUR, TRY, etc.)
-  pricePeriodStart  DateTime? // Start date of the current price period
-  pricePeriodEnd    DateTime? // End date of the current price period (null = indefinite)
-  // Bank Account
-  bankAccountName   String? // Account holder name
-  bankName          String? // Bank name
-  bankAccountNumber String? // Account number
-  bankIban          String? // IBAN
-  bankSwift         String? // SWIFT/BIC code
-  bankBranch        String? // Branch name or code
-  // Default location for the organization
-  defaultLocationId String?
-  defaultLocation   Location? @relation("OrganizationDefaultLocation", fields: [defaultLocationId], references: [id], onDelete: SetNull)
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-
-  // Relations
-  users              User[]
-  members            Member[]
-  classes            Class[]
-  sessions           Session[]
+  id                 String              @id @default(uuid())
+  name               String
+  slug               String              @unique
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  address            String?
+  contactUserId      String?
+  description        String?
+  email              String?
+  facebook           String?
+  instagram          String?
+  linkedin           String?
+  phone              String?
+  twitter            String?
+  website            String?
+  latitude           Float?
+  longitude          Float?
+  tiktok             String?
+  smtpFromEmail      String?
+  smtpFromName       String?
+  smtpHost           String?
+  smtpPassword       String?
+  smtpPort           Int?
+  smtpUser           String?
+  language           String?             @default("en")
+  creditPrice        Float?
+  currency           String?             @default("USD")
+  pricePeriodEnd     DateTime?
+  pricePeriodStart   DateTime?
+  defaultLocationId  String?
+  bankAccountName    String?
+  bankName           String?
+  bankAccountNumber  String?
+  bankIban           String?
+  bankSwift          String?
+  bankBranch         String?
   bookings           Booking[]
-  instructors        Instructor[]
-  creditTransactions CreditTransaction[]
-  priceHistory       PriceHistory[]
-  locations          Location[]
-  packages           Package[]
+  classes            Class[]
+  contactSubmissions ContactSubmission[]
   coupons            Coupon[]
+  creditTransactions CreditTransaction[]
+  instructors        Instructor[]
+  locations          Location[]
+  members            Member[]
+  contactUser        User?               @relation("OrganizationContact", fields: [contactUserId], references: [id])
+  defaultLocation    Location?           @relation("OrganizationDefaultLocation", fields: [defaultLocationId], references: [id])
   packageRedemptions PackageRedemption[]
+  packages           Package[]
+  priceHistory       PriceHistory[]
+  sessions           Session[]
+  users              User[]
 
   @@index([slug])
   @@index([contactUserId])
   @@map("organizations")
 }
 
-// User model linked to Supabase auth
-// The auth.uid from Supabase will be stored here
 model User {
-  id                        String    @id @default(uuid())
-  supabaseUserId            String    @unique // This links to auth.users.id in Supabase
-  email                     String
-  name                      String?
-  dateOfBirth               DateTime? // Date of birth from registration form
-  mobilePhone               String? // Mobile phone number (with country code)
-  countryCode               String? // Country code (e.g., "+90", "+1")
-  tocAccepted               Boolean   @default(false) // Terms of Conditions acceptance
-  tocAcceptedAt             DateTime? // When TOC was accepted
-  liabilityWaiverAccepted   Boolean   @default(false) // Liability waiver acceptance
-  liabilityWaiverAcceptedAt DateTime? // When liability waiver was accepted
-  role                      UserRole  @default(MEMBER)
-  createdAt                 DateTime  @default(now())
-  updatedAt                 DateTime  @updatedAt
-
-  // Multi-tenant relation
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-
-  // Relations
-  memberships                 Member[]
+  id                          String              @id @default(uuid())
+  supabaseUserId              String              @unique
+  email                       String
+  name                        String?
+  role                        UserRole            @default(MEMBER)
+  createdAt                   DateTime            @default(now())
+  updatedAt                   DateTime            @updatedAt
+  organizationId              String
+  countryCode                 String?
+  dateOfBirth                 DateTime?
+  liabilityWaiverAccepted     Boolean             @default(false)
+  liabilityWaiverAcceptedAt   DateTime?
+  mobilePhone                 String?
+  tocAccepted                 Boolean             @default(false)
+  tocAcceptedAt               DateTime?
   bookings                    Booking[]
-  instructor                  Instructor?
-  contactOrganizations        Organization[]      @relation("OrganizationContact")
   performedCreditTransactions CreditTransaction[] @relation("CreditTransactionPerformedBy")
+  instructor                  Instructor?
+  memberships                 Member[]
+  contactOrganizations        Organization[]      @relation("OrganizationContact")
   priceHistoryChanges         PriceHistory[]      @relation("PriceHistoryChangedBy")
+  organization                Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([supabaseUserId])
   @@index([organizationId])
@@ -113,36 +95,24 @@ model User {
   @@map("users")
 }
 
-enum UserRole {
-  ADMIN
-  TENANT_ADMIN
-  INSTRUCTOR
-  MEMBER
-}
-
-// Member model for class participants
 model Member {
-  id             String       @id @default(uuid())
-  userId         String
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  membershipType String?
-  creditBalance  Float        @default(0) // Credit balance for the member
-  status         MemberStatus @default(ACTIVE)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-
-  // Relations
+  id                   String                @id @default(uuid())
+  userId               String
+  organizationId       String
+  membershipType       String?
+  status               MemberStatus          @default(ACTIVE)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  creditBalance        Float                 @default(0)
+  isEliteMember        Boolean               @default(false)
+  hasAllAccess         Boolean               @default(false)
+  allAccessExpiresAt   DateTime?
+  allAccessDailyUsages AllAccessDailyUsage[]
   bookings             Booking[]
   creditTransactions   CreditTransaction[]
+  organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   packageRedemptions   PackageRedemption[]
-  allAccessDailyUsages AllAccessDailyUsage[]
-
-  // Quick reference fields (optional, for performance)
-  isEliteMember      Boolean   @default(false)
-  hasAllAccess       Boolean   @default(false)
-  allAccessExpiresAt DateTime?
 
   @@unique([userId, organizationId])
   @@index([organizationId])
@@ -152,128 +122,96 @@ model Member {
   @@map("members")
 }
 
-enum MemberStatus {
-  ACTIVE
-  INACTIVE
-  SUSPENDED
-}
-
-// Instructor model
 model Instructor {
   id             String           @id @default(uuid())
   userId         String           @unique
-  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   organizationId String
-  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   bio            String?
-  photoUrl       String?
   specialties    String[]
   status         InstructorStatus @default(ACTIVE)
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
-
-  // Relations
-  sessions Session[]
+  photoUrl       String?
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessions       Session[]
 
   @@index([organizationId])
   @@index([userId])
   @@map("instructors")
 }
 
-enum InstructorStatus {
-  ACTIVE
-  INACTIVE
-}
-
-// Class model (e.g., "Morning Spin", "Evening Power")
 model Class {
   id             String       @id @default(uuid())
   name           String
-  nameTr         String? // Turkish name
   description    String?
-  descriptionTr  String? // Turkish description
-  musicGenre     String? // Music genre in English (e.g., "Hard House, Pop, Commercial")
-  musicGenreTr   String? // Music genre in Turkish
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   status         ClassStatus  @default(ACTIVE)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
-
-  // Relations
-  sessions Session[]
+  musicGenre     String?
+  nameTr         String?
+  descriptionTr  String?
+  musicGenreTr   String?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sessions       Session[]
 
   @@index([organizationId])
   @@map("classes")
 }
 
-enum ClassStatus {
-  ACTIVE
-  INACTIVE
-  ARCHIVED
-}
-
-// Location model (physical locations/studios)
 model Location {
-  id             String       @id @default(uuid())
-  name           String
-  description    String?
-  address        String?
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  isDefault      Boolean      @default(false) // Whether this is the default location
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-
-  // Relations
+  id                      String         @id @default(uuid())
+  name                    String
+  description             String?
+  address                 String?
+  organizationId          String
+  isDefault               Boolean        @default(false)
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+  organization            Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  defaultForOrganizations Organization[] @relation("OrganizationDefaultLocation")
   seatLayouts             SeatLayout[]
   sessions                Session[]
-  defaultForOrganizations Organization[] @relation("OrganizationDefaultLocation")
 
   @@index([organizationId])
   @@index([isDefault])
   @@map("locations")
 }
 
-// SeatLayout model (seat layout configuration for a location)
 model SeatLayout {
   id          String   @id @default(uuid())
   locationId  String
-  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  name        String // e.g., "Standard Layout", "VIP Setup"
+  name        String
   description String?
-  gridRows    Int? // Grid rows (e.g., 3 for 3x4 grid)
-  gridColumns Int? // Grid columns (e.g., 4 for 3x4 grid)
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
-  // Relations
-  seats Seat[]
+  gridRows    Int?
+  gridColumns Int?
+  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  seats       Seat[]
 
   @@index([locationId])
   @@index([isActive])
   @@map("seat_layouts")
 }
 
-// Seat model (individual seats in a layout)
 model Seat {
   id           String     @id @default(uuid())
   seatLayoutId String
-  seatLayout   SeatLayout @relation(fields: [seatLayoutId], references: [id], onDelete: Cascade)
-  seatNumber   String // e.g., "A1", "B5", etc.
-  row          String? // Optional row identifier
-  column       Int? // Optional column number
+  seatNumber   String
+  row          String?
+  column       Int?
   type         SeatType   @default(NORMAL)
-  creditCost   Int        @default(1) // Cost in credits for booking this seat
-  x            Float? // X coordinate for visual layout (0-100)
-  y            Float? // Y coordinate for visual layout (0-100)
+  creditCost   Int        @default(1)
+  x            Float?
+  y            Float?
   isActive     Boolean    @default(true)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
-
-  // Relations
-  bookings Booking[]
+  bookings     Booking[]
+  seatLayout   SeatLayout @relation(fields: [seatLayoutId], references: [id], onDelete: Cascade)
 
   @@unique([seatLayoutId, seatNumber])
   @@index([seatLayoutId])
@@ -282,37 +220,26 @@ model Seat {
   @@map("seats")
 }
 
-enum SeatType {
-  NORMAL
-  EXCLUSIVE
-  INSTRUCTOR
-  PODIUM
-  ARCHITECTURAL_COLUMN
-}
-
-// Session model (specific instance of a class at a date/time)
 model Session {
   id              String        @id @default(uuid())
   classId         String
-  class           Class         @relation(fields: [classId], references: [id], onDelete: Cascade)
   organizationId  String
-  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  locationId      String?
-  location        Location?     @relation(fields: [locationId], references: [id], onDelete: SetNull)
   instructorId    String
-  instructor      Instructor    @relation(fields: [instructorId], references: [id], onDelete: Restrict)
   startTime       DateTime
   endTime         DateTime
-  duration        Int // Duration in minutes (auto-calculated from startTime and endTime)
-  amPm            String // "AM" or "PM" (auto-calculated from startTime for search purposes)
   maxCapacity     Int
   currentBookings Int           @default(0)
   status          SessionStatus @default(SCHEDULED)
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
-
-  // Relations
-  bookings Booking[]
+  locationId      String?
+  duration        Int
+  amPm            String
+  bookings        Booking[]
+  class           Class         @relation(fields: [classId], references: [id], onDelete: Cascade)
+  instructor      Instructor    @relation(fields: [instructorId], references: [id])
+  location        Location?     @relation(fields: [locationId], references: [id])
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([classId])
@@ -323,43 +250,32 @@ model Session {
   @@map("sessions")
 }
 
-enum SessionStatus {
-  SCHEDULED
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
-}
-
-// Booking model (member booking a session)
 model Booking {
-  id             String        @id @default(uuid())
-  sessionId      String
-  session        Session       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  memberId       String
-  member         Member        @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  userId         String
-  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organizationId String
-  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  seatId         String? // Optional: specific seat booked
-  seat           Seat?         @relation(fields: [seatId], references: [id], onDelete: SetNull)
-  creditCost     Int           @default(1) // Credit cost for this booking (based on seat type)
-  status         BookingStatus @default(CONFIRMED)
-  checkedIn      Boolean       @default(false)
-  checkedInAt    DateTime?
-
-  // Package system fields
-  paymentType           String? // 'CREDIT', 'ALL_ACCESS', 'FRIEND_PASS', 'FREE'
+  id                    String               @id @default(uuid())
+  sessionId             String
+  memberId              String
+  userId                String
+  organizationId        String
+  status                BookingStatus        @default(CONFIRMED)
+  checkedIn             Boolean              @default(false)
+  checkedInAt           DateTime?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  creditCost            Int                  @default(1)
+  seatId                String?
+  paymentType           String?
   packageRedemptionId   String?
-  packageRedemption     PackageRedemption?   @relation("PackageRedemptionBookings", fields: [packageRedemptionId], references: [id], onDelete: SetNull)
-  creditsUsed           Int? // Number of credits deducted (for credit-based bookings)
+  creditsUsed           Int?
   allAccessDailyUsageId String?              @unique
-  allAccessDailyUsage   AllAccessDailyUsage? @relation
-  couponCode            String? // Coupon code used (if any)
+  couponCode            String?
+  allAccessDailyUsage   AllAccessDailyUsage?
+  member                Member               @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  organization          Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  packageRedemption     PackageRedemption?   @relation("PackageRedemptionBookings", fields: [packageRedemptionId], references: [id])
+  seat                  Seat?                @relation(fields: [seatId], references: [id])
+  session               Session              @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user                  User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   friendPassRedemption  PackageRedemption?   @relation("FriendPassBooking")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
   @@unique([sessionId, memberId])
   @@index([organizationId])
@@ -372,28 +288,20 @@ model Booking {
   @@map("bookings")
 }
 
-enum BookingStatus {
-  CONFIRMED
-  CANCELLED
-  NO_SHOW
-  COMPLETED
-}
-
-// Credit Transaction model to track all credit balance changes
 model CreditTransaction {
   id                String                @id @default(uuid())
   memberId          String
-  member            Member                @relation(fields: [memberId], references: [id], onDelete: Cascade)
   organizationId    String
-  organization      Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  amount            Float // Positive for credit added, negative for credit deducted
-  balanceBefore     Float // Balance before this transaction
-  balanceAfter      Float // Balance after this transaction
+  amount            Float
+  balanceBefore     Float
+  balanceAfter      Float
   type              CreditTransactionType
-  description       String? // Optional description/reason for the transaction
-  performedByUserId String? // User who performed this transaction (admin/tenant_admin)
-  performedBy       User?                 @relation("CreditTransactionPerformedBy", fields: [performedByUserId], references: [id], onDelete: SetNull)
+  description       String?
+  performedByUserId String?
   createdAt         DateTime              @default(now())
+  member            Member                @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  organization      Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  performedBy       User?                 @relation("CreditTransactionPerformedBy", fields: [performedByUserId], references: [id])
 
   @@index([organizationId])
   @@index([memberId])
@@ -402,29 +310,20 @@ model CreditTransaction {
   @@map("credit_transactions")
 }
 
-enum CreditTransactionType {
-  MANUAL_ADD // Manually added by admin
-  MANUAL_DEDUCT // Manually deducted by admin
-  BOOKING_PAYMENT // Used for booking a class
-  REFUND // Refund for cancelled booking
-  ADJUSTMENT // Manual adjustment/correction
-}
-
-// Price History model to track organization credit price changes
 model PriceHistory {
   id                String       @id @default(uuid())
   organizationId    String
-  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  creditPriceBefore Float? // Credit price before change (null for first entry)
-  creditPriceAfter  Float // Credit price after change
-  currencyBefore    String? // Currency before change
-  currencyAfter     String // Currency after change
-  effectiveFrom     DateTime     @default(now()) // When this price became/will become effective
-  effectiveUntil    DateTime? // When this price period ends (null = indefinite or current)
-  changedByUserId   String? // User who made the change (admin/tenant_admin)
-  changedBy         User?        @relation("PriceHistoryChangedBy", fields: [changedByUserId], references: [id], onDelete: SetNull)
-  reason            String? // Optional reason for price change
+  creditPriceBefore Float?
+  creditPriceAfter  Float
+  currencyBefore    String?
+  currencyAfter     String
+  changedByUserId   String?
+  reason            String?
   createdAt         DateTime     @default(now())
+  effectiveFrom     DateTime     @default(now())
+  effectiveUntil    DateTime?
+  changedBy         User?        @relation("PriceHistoryChangedBy", fields: [changedByUserId], references: [id])
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([createdAt])
@@ -434,40 +333,31 @@ model PriceHistory {
   @@map("price_history")
 }
 
-// Package model - Standard packages with fixed pricing
 model Package {
-  id             String       @id @default(uuid())
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  code           String       @unique // e.g., "SINGLE-RIDE", "ELITE-30"
-  name           String
-  nameTr         String?
-  type           PackageType
-  price          Float // Package price in TL
-  credits        Int? // Number of credits (null for ALL_ACCESS)
-  pricePerCredit Float? // Calculated: price / credits
-
-  // Calculated fields (based on organization.creditPrice)
-  basePrice          Float? // creditPrice * credits (if applicable)
-  discountAmount     Float? // basePrice - price
-  discountPercentage Float? // (discountAmount / basePrice) * 100
-
-  description   String?
-  descriptionTr String?
-  benefits      Json? // Array of benefits: ["friend_pass", "priority_booking", "elite_badge"]
-
-  // Validity
-  validFrom  DateTime?
-  validUntil DateTime?
-
-  isActive     Boolean  @default(true)
-  displayOrder Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  // Relations
-  packageRedemptions PackageRedemption[]
+  id                 String              @id @default(uuid())
+  organizationId     String
+  code               String              @unique
+  name               String
+  nameTr             String?
+  type               PackageType
+  price              Float
+  credits            Int?
+  pricePerCredit     Float?
+  basePrice          Float?
+  discountAmount     Float?
+  discountPercentage Float?
+  description        String?
+  descriptionTr      String?
+  benefits           Json?
+  validFrom          DateTime?
+  validUntil         DateTime?
+  isActive           Boolean             @default(true)
+  displayOrder       Int                 @default(0)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
   coupons            Coupon[]
+  packageRedemptions PackageRedemption[]
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([code])
@@ -476,57 +366,176 @@ model Package {
   @@map("packages")
 }
 
-enum PackageType {
-  SINGLE_RIDE
-  CREDIT_PACK
-  ELITE_30
-  ALL_ACCESS
-}
-
-// Coupon model - Flexible promotional codes
 model Coupon {
-  id             String       @id @default(uuid())
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  code           String       @unique // e.g., "SUMMER2024", "PROMO-ABC123"
-  name           String
-  nameTr         String?
-  description    String?
-  descriptionTr  String?
-
-  couponType CouponType
-
-  // For package coupons
-  packageId     String?
-  package       Package? @relation(fields: [packageId], references: [id], onDelete: SetNull)
-  customPrice   Float?
-  customCredits Int?
-
-  // For discount coupons
-  discountType         DiscountType?
-  discountValue        Float? // 10 for 10%, or 500 for 500 TL
-  applicablePackageIds String[] // Which packages this applies to
-
-  // For credit bonus coupons
-  bonusCredits Int?
-
-  // Validity
+  id                      String              @id @default(uuid())
+  organizationId          String
+  code                    String              @unique
+  name                    String
+  nameTr                  String?
+  description             String?
+  descriptionTr           String?
+  couponType              CouponType
+  packageId               String?
+  customPrice             Float?
+  customCredits           Int?
+  discountType            DiscountType?
+  discountValue           Float?
+  applicablePackageIds    String[]
+  bonusCredits            Int?
   validFrom               DateTime?
   validUntil              DateTime?
-  maxRedemptions          Int? // NULL = unlimited
-  maxRedemptionsPerMember Int       @default(1)
-  isActive                Boolean   @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  packageRedemptions PackageRedemption[]
+  maxRedemptions          Int?
+  maxRedemptionsPerMember Int                 @default(1)
+  isActive                Boolean             @default(true)
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+  organization            Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  package                 Package?            @relation(fields: [packageId], references: [id])
+  packageRedemptions      PackageRedemption[]
 
   @@index([organizationId])
   @@index([code])
   @@index([isActive])
   @@map("coupons")
+}
+
+model PackageRedemption {
+  id                   String                @id @default(uuid())
+  memberId             String
+  organizationId       String
+  packageId            String?
+  couponId             String?
+  redemptionType       RedemptionType
+  redeemedAt           DateTime              @default(now())
+  redeemedBy           String?
+  originalPrice        Float
+  discountAmount       Float                 @default(0)
+  finalPrice           Float
+  creditsAdded         Int?
+  allAccessExpiresAt   DateTime?
+  allAccessDays        Int?
+  friendPassAvailable  Boolean               @default(false)
+  friendPassExpiresAt  DateTime?
+  friendPassUsed       Boolean               @default(false)
+  friendPassUsedAt     DateTime?
+  friendPassBookingId  String?               @unique
+  status               RedemptionStatus      @default(PENDING)
+  notes                String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  allAccessDailyUsages AllAccessDailyUsage[]
+  bookings             Booking[]             @relation("PackageRedemptionBookings")
+  coupon               Coupon?               @relation(fields: [couponId], references: [id])
+  friendPassBooking    Booking?              @relation("FriendPassBooking", fields: [friendPassBookingId], references: [id])
+  member               Member                @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  package              Package?              @relation(fields: [packageId], references: [id])
+
+  @@index([organizationId])
+  @@index([memberId])
+  @@index([packageId])
+  @@index([couponId])
+  @@index([status])
+  @@index([allAccessExpiresAt])
+  @@index([friendPassExpiresAt])
+  @@map("package_redemptions")
+}
+
+model AllAccessDailyUsage {
+  id                  String            @id @default(uuid())
+  packageRedemptionId String
+  memberId            String
+  usageDate           DateTime          @db.Date
+  bookingId           String?           @unique
+  wasNoShow           Boolean           @default(false)
+  createdAt           DateTime          @default(now())
+  booking             Booking?          @relation(fields: [bookingId], references: [id])
+  member              Member            @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  packageRedemption   PackageRedemption @relation(fields: [packageRedemptionId], references: [id], onDelete: Cascade)
+
+  @@unique([packageRedemptionId, usageDate])
+  @@index([memberId])
+  @@index([usageDate])
+  @@map("all_access_daily_usage")
+}
+
+model ContactSubmission {
+  id             String        @id @default(uuid())
+  organizationId String
+  name           String
+  email          String
+  phone          String?
+  message        String
+  status         ContactStatus @default(NEW)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([email])
+  @@index([status])
+  @@map("contact_submissions")
+}
+
+enum UserRole {
+  ADMIN
+  INSTRUCTOR
+  MEMBER
+  TENANT_ADMIN
+}
+
+enum MemberStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum InstructorStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ClassStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum SeatType {
+  NORMAL
+  EXCLUSIVE
+  INSTRUCTOR
+  PODIUM
+  ARCHITECTURAL_COLUMN
+}
+
+enum SessionStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum BookingStatus {
+  CONFIRMED
+  CANCELLED
+  NO_SHOW
+  COMPLETED
+}
+
+enum CreditTransactionType {
+  MANUAL_ADD
+  MANUAL_DEDUCT
+  BOOKING_PAYMENT
+  REFUND
+  ADJUSTMENT
+}
+
+enum PackageType {
+  SINGLE_RIDE
+  CREDIT_PACK
+  ELITE_30
+  ALL_ACCESS
 }
 
 enum CouponType {
@@ -540,64 +549,6 @@ enum DiscountType {
   FIXED_AMOUNT
 }
 
-// PackageRedemption model - Unified redemption tracking
-model PackageRedemption {
-  id             String       @id @default(uuid())
-  memberId       String
-  member         Member       @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-
-  // Can be either Package or Coupon
-  packageId String?
-  package   Package? @relation(fields: [packageId], references: [id], onDelete: SetNull)
-  couponId  String?
-  coupon    Coupon?  @relation(fields: [couponId], references: [id], onDelete: SetNull)
-
-  // Redemption details
-  redemptionType RedemptionType
-  redeemedAt     DateTime       @default(now())
-  redeemedBy     String? // User ID who redeemed (admin)
-
-  // Pricing
-  originalPrice  Float
-  discountAmount Float @default(0)
-  finalPrice     Float
-
-  // What was granted
-  creditsAdded       Int?
-  allAccessExpiresAt DateTime?
-  allAccessDays      Int?
-
-  // For ELITE_30 packages
-  friendPassAvailable Boolean   @default(false)
-  friendPassExpiresAt DateTime?
-  friendPassUsed      Boolean   @default(false)
-  friendPassUsedAt    DateTime?
-  friendPassBookingId String?   @unique
-  friendPassBooking   Booking?  @relation("FriendPassBooking", fields: [friendPassBookingId], references: [id], onDelete: SetNull)
-
-  // Status
-  status RedemptionStatus @default(PENDING)
-
-  notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  bookings             Booking[]             @relation("PackageRedemptionBookings")
-  allAccessDailyUsages AllAccessDailyUsage[]
-
-  @@index([organizationId])
-  @@index([memberId])
-  @@index([packageId])
-  @@index([couponId])
-  @@index([status])
-  @@index([allAccessExpiresAt])
-  @@index([friendPassExpiresAt])
-  @@map("package_redemptions")
-}
-
 enum RedemptionType {
   PACKAGE_DIRECT
   COUPON_PACKAGE
@@ -605,28 +556,16 @@ enum RedemptionType {
 }
 
 enum RedemptionStatus {
-  PENDING
   ACTIVE
   EXPIRED
   CANCELLED
   USED
+  PENDING
 }
 
-// AllAccessDailyUsage model - Track daily usage for All Access packages
-model AllAccessDailyUsage {
-  id                  String            @id @default(uuid())
-  packageRedemptionId String
-  packageRedemption   PackageRedemption @relation(fields: [packageRedemptionId], references: [id], onDelete: Cascade)
-  memberId            String
-  member              Member            @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  usageDate           DateTime          @db.Date // YYYY-MM-DD
-  bookingId           String?           @unique
-  booking             Booking?          @relation(fields: [bookingId], references: [id], onDelete: SetNull)
-  wasNoShow           Boolean           @default(false)
-  createdAt           DateTime          @default(now())
-
-  @@unique([packageRedemptionId, usageDate])
-  @@index([memberId])
-  @@index([usageDate])
-  @@map("all_access_daily_usage")
+enum ContactStatus {
+  NEW
+  READ
+  RESPONDED
+  ARCHIVED
 }

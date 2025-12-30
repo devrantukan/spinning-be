@@ -8,46 +8,50 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  return withOrganizationContext(request, async (req, context) => {
-    try {
-      const instructor = await prisma.instructor.findFirst({
-        where: {
-          id,
-          organizationId: context.organizationId,
-        },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              role: true,
+  return withOrganizationContext(
+    request,
+    async (req, context) => {
+      try {
+        const instructor = await prisma.instructor.findFirst({
+          where: {
+            id,
+            organizationId: context.organizationId,
+          },
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+              },
+            },
+            _count: {
+              select: {
+                sessions: true,
+              },
             },
           },
-          _count: {
-            select: {
-              sessions: true,
-            },
-          },
-        },
-      });
+        });
 
-      if (!instructor) {
+        if (!instructor) {
+          return NextResponse.json(
+            { error: "Instructor not found" },
+            { status: 404 }
+          );
+        }
+
+        return NextResponse.json(instructor);
+      } catch (error) {
+        console.error("Error fetching instructor:", error);
         return NextResponse.json(
-          { error: "Instructor not found" },
-          { status: 404 }
+          { error: "Internal server error" },
+          { status: 500 }
         );
       }
-
-      return NextResponse.json(instructor);
-    } catch (error) {
-      console.error("Error fetching instructor:", error);
-      return NextResponse.json(
-        { error: "Internal server error" },
-        { status: 500 }
-      );
-    }
-  });
+    },
+    { requireAuth: false }
+  );
 }
 
 // PATCH /api/instructors/[id] - Update an instructor
@@ -177,17 +181,21 @@ export async function DELETE(
         );
       }
 
-      // Delete the instructor record
-      // Note: The User record will remain, but the Instructor record will be deleted
-      // If you want to delete the User as well, uncomment the user deletion code below
-      await prisma.instructor.delete({
-        where: { id },
-      });
+      // Perform deletion and role update in a transaction
+      await prisma.$transaction([
+        // 1. Delete the instructor record
+        prisma.instructor.delete({
+          where: { id },
+        }),
+        // 2. Update the user's role to MEMBER to prevent auto-recreation
+        // This is crucial because the GET endpoint re-creates instructors for users with INSTRUCTOR role
+        prisma.user.update({
+          where: { id: instructor.userId },
+          data: { role: "MEMBER" },
+        }),
+      ]);
 
-      // Optional: Also delete the associated user (uncomment if needed)
-      // await prisma.user.delete({
-      //   where: { id: instructor.userId },
-      // });
+      console.log(`[INSTRUCTORS] Successfully deleted instructor ${id} and updated user ${instructor.userId} role to MEMBER`);
 
       return NextResponse.json({ message: "Instructor deleted successfully" });
     } catch (error: any) {
@@ -205,7 +213,3 @@ export async function DELETE(
     }
   });
 }
-
-
-
-
