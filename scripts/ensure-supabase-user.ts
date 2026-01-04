@@ -1,8 +1,8 @@
 
-const { PrismaClient } = require('@prisma/client');
+const { PrismaClient: DataClient } = require('@prisma/client');
 const { createClient } = require('@supabase/supabase-js');
 
-const prisma = new PrismaClient();
+const localPrisma = new DataClient();
 
 // Ensure environment variables are loaded (ts-node usually loads .env if configured, otherwise rely on shell env)
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -103,7 +103,7 @@ async function ensureSupabaseUser() {
     console.log(`Updating Prisma user with Supabase ID: ${supabaseUserId}...`);
     
     // First, find the user to ensure they exist in DB
-    const dbUser = await prisma.user.findFirst({
+    const dbUser = await localPrisma.user.findFirst({
         where: { email } // Use findFirst because email might not be unique in schema (though usually is for auth)
     });
 
@@ -115,7 +115,7 @@ async function ensureSupabaseUser() {
         throw new Error(`User with email ${email} not found in Postgres database. Please run make-tenant-admin.ts first.`);
     }
 
-    const updated = await prisma.user.updateMany({
+    const updated = await localPrisma.user.updateMany({
         where: { email }, // Update all records with this email? Schema says supabaseUserId is unique.
         // If multiple users share email, this will fail on unique constraint if we update all to same ID.
         // But usually Schema User.email is unique or SupabaseUserId is unique.
@@ -130,7 +130,7 @@ async function ensureSupabaseUser() {
     });
 
     // Update by ID to be safe
-     const result = await prisma.user.update({
+     const result = await localPrisma.user.update({
         where: { id: dbUser.id },
         data: { supabaseUserId }
     });
@@ -143,8 +143,10 @@ async function ensureSupabaseUser() {
     console.error('Error:', (error as any).message);
     process.exit(1);
   } finally {
-    await prisma.$disconnect();
+    await localPrisma.$disconnect();
   }
 }
 
 ensureSupabaseUser();
+
+export {};
