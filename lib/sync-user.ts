@@ -15,6 +15,7 @@ export async function syncUserFromSupabase(
     dob?: string;
     mobilePhone?: string;
     countryCode?: string;
+    identityNumber?: string;
     tocAccepted?: boolean;
     tocAcceptedAt?: string;
     liabilityWaiverAccepted?: boolean;
@@ -50,6 +51,8 @@ export async function syncUserFromSupabase(
             dateOfBirth !== null ? dateOfBirth : existingUser.dateOfBirth,
           mobilePhone: userMetadata.mobilePhone || existingUser.mobilePhone,
           countryCode: userMetadata.countryCode || existingUser.countryCode,
+          identityNumber:
+            userMetadata.identityNumber || existingUser.identityNumber,
         };
 
         // Update TOC and liability waiver if provided
@@ -116,6 +119,7 @@ export async function syncUserFromSupabase(
         dateOfBirth: dateOfBirth,
         mobilePhone: userMetadata?.mobilePhone || null,
         countryCode: userMetadata?.countryCode || null,
+        identityNumber: userMetadata?.identityNumber || null,
         tocAccepted: userMetadata?.tocAccepted || false,
         tocAcceptedAt: tocAcceptedAt,
         liabilityWaiverAccepted: userMetadata?.liabilityWaiverAccepted || false,

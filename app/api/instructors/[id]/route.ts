@@ -63,7 +63,7 @@ export async function PATCH(
   return withOrganizationContext(request, async (req, context) => {
     try {
       const body = await req.json();
-      const { bio, photoUrl, specialties, status } = body;
+      const { bio, bioTr, photoUrl, specialties, specialtiesTr, status } = body;
 
       // Check if instructor exists and belongs to organization
       const existingInstructor = await prisma.instructor.findFirst({
@@ -91,8 +91,10 @@ export async function PATCH(
       // Update instructor
       const updateData: any = {};
       if (bio !== undefined) updateData.bio = bio || null;
+      if (bioTr !== undefined) updateData.bioTr = bioTr || null;
       if (photoUrl !== undefined) updateData.photoUrl = photoUrl || null;
       if (specialties !== undefined) updateData.specialties = specialties;
+      if (specialtiesTr !== undefined) updateData.specialtiesTr = specialtiesTr;
       if (status !== undefined) updateData.status = status;
 
       const instructor = await prisma.instructor.update({
@@ -213,3 +215,6 @@ export async function DELETE(
     }
   });
 }
+
+
+

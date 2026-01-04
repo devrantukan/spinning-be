@@ -81,6 +81,7 @@ model User {
   mobilePhone                 String?
   tocAccepted                 Boolean             @default(false)
   tocAcceptedAt               DateTime?
+  identityNumber              String?
   bookings                    Booking[]
   performedCreditTransactions CreditTransaction[] @relation("CreditTransactionPerformedBy")
   instructor                  Instructor?
@@ -127,7 +128,9 @@ model Instructor {
   userId         String           @unique
   organizationId String
   bio            String?
+  bioTr          String?
   specialties    String[]
+  specialtiesTr  String[]
   status         InstructorStatus @default(ACTIVE)
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt

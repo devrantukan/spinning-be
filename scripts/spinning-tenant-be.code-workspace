@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "../../spinning-tenant-be"
+		},
+		{
+			"path": ".."
+		},
+		{
+			"path": "../../spinning"
+		}
+	],
+	"settings": {}
+}

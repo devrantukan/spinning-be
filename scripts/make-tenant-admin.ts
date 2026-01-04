@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+const { PrismaClient } = require("@prisma/client");
 
 const prisma = new PrismaClient()
 
@@ -18,9 +18,27 @@ async function makeTenantAdmin() {
     })
 
     if (!user) {
-      console.error(`User with email ${email} not found`)
-      console.error('Make sure the user has logged in at least once to be created in the database')
-      process.exit(1)
+      console.log(`User with email ${email} not found. Creating new user...`)
+      
+      // Hardcoded Organization ID for Spin8 Studio from previous lookup
+      const spin8OrgId = 'b25567c3-b100-4ef3-b6b7-d4b43091424d';
+      const randomSupabaseId = require('crypto').randomUUID();
+      
+      const newUser = await prisma.user.create({
+        data: {
+          email,
+          role: 'TENANT_ADMIN',
+          organizationId: spin8OrgId,
+          supabaseUserId: randomSupabaseId,
+          // name: 'Tenant Admin', // Optional
+        }
+      })
+
+      console.log(`✅ Successfully created user ${email} as TENANT_ADMIN`)
+      console.log(`User ID: ${newUser.id}`)
+      console.log(`Supabase User ID (Randomly Generated): ${newUser.supabaseUserId}`)
+      console.log(`Organization ID: ${newUser.organizationId}`)
+      process.exit(0)
     }
 
     if (user.role === 'TENANT_ADMIN') {

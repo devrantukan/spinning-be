@@ -55,6 +55,7 @@ export async function POST(request: NextRequest) {
             record.raw_user_meta_data?.liabilityWaiverAccepted,
           liabilityWaiverAcceptedAt:
             record.raw_user_meta_data?.liabilityWaiverAcceptedAt,
+          identityNumber: record.raw_user_meta_data?.identityNumber,
         }
       );
 
@@ -117,6 +118,7 @@ export async function POST(request: NextRequest) {
         dateOfBirth: dateOfBirth !== null ? dateOfBirth : undefined,
         mobilePhone: record.raw_user_meta_data?.mobilePhone || undefined,
         countryCode: record.raw_user_meta_data?.countryCode || undefined,
+        identityNumber: record.raw_user_meta_data?.identityNumber || undefined,
       };
 
       // Only update TOC and liability waiver if provided in metadata
